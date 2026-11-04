@@ -1,2 +1,6 @@
 tern.d.luau
 .DS_Store
+# Local project-management docs: kept in the dev folder, never published.
+AGENTS.md
+PROJECT-STATE.md
+HANDOFF.md
