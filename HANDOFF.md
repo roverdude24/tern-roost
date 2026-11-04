@@ -2,7 +2,7 @@
 
 ## Next action
 
-Push the local commits to GitHub (`git push`), then retake `docs/panel.png` with Settled at the bottom.
+Retake `docs/panel.png` with Settled at the bottom, commit and `git push origin main` from the dev repo, then `git -C ~/Developer/tern-roost pull dev main`.
 
 ## Where things are
 

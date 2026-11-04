@@ -5,7 +5,7 @@ Updated 2026-11-04.
 ## Status
 
 - Roost 0.2.0 is published (https://github.com/roverdude24/tern-roost). Tern runs it live from `~/Developer/tern-roost` (original linked path, kept at the user's request); this folder, `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN`, is the development repo. The live copy pulls from here (`git -C ~/Developer/tern-roost pull dev main`).
-- Local commits not yet pushed to GitHub: Settled moved into the canvas dock so it stays pinned to the panel's bottom edge (user request "have settled as the bottom"), shows the newest 8, then "+N older" (toggle checked live via AX); project docs; two-folder setup.
+- Pushed to GitHub `main` (8a3d4b4, 2026-11-04), unreleased on top of 0.2.0: Settled moved into the canvas dock so it stays pinned to the panel's bottom edge (user request "have settled as the bottom"), shows the newest 8, then "+N older" (toggle checked live via AX); project docs; two-folder setup.
 - Upstream: Overseer PR https://github.com/mmnavarr/overseer/pull/3 (Remove project) open, awaiting the owner. Fork clone: `~/Developer/overseer`, branch `remove-project`. The fixed Overseer is installed in the user's Tern; backup of the previous copy in `/tmp/overseer-backup-*` (lost on reboot).
 
 ## Locked decisions
@@ -43,7 +43,6 @@ Updated 2026-11-04.
 
 ## Next steps
 
-1. Push to GitHub.
-2. Refresh `docs/panel.png` showing Settled at the bottom.
-3. Untested paths to exercise: restore a settled omp/claude session, PR badge on a repo with a GitHub remote, ages of days, Add folder after 0.2.
-4. Watch Overseer PR #3; delete `plugin-data/session-folders` once the user agrees.
+1. Refresh `docs/panel.png` showing Settled at the bottom.
+2. Untested paths to exercise: restore a settled omp/claude session, PR badge on a repo with a GitHub remote, ages of days, Add folder after 0.2.
+3. Watch Overseer PR #3; delete `plugin-data/session-folders` once the user agrees.
