@@ -4,8 +4,8 @@ Updated 2026-11-04.
 
 ## Status
 
-- Roost 0.2.0 is published (https://github.com/roverdude24/tern-roost) and linked live in the user's Tern 0.9.11 from this folder: `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN`.
-- Local commits not yet pushed: Settled moved into the canvas dock so it stays pinned to the panel's bottom edge (user request "have settled as the bottom"), shows the newest 8, then "+N older" (toggle checked live via AX); project docs; repo move.
+- Roost 0.2.0 is published (https://github.com/roverdude24/tern-roost). Tern runs it live from `~/Developer/tern-roost` (original linked path, kept at the user's request); this folder, `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN`, is the development repo. The live copy pulls from here (`git -C ~/Developer/tern-roost pull dev main`).
+- Local commits not yet pushed to GitHub: Settled moved into the canvas dock so it stays pinned to the panel's bottom edge (user request "have settled as the bottom"), shows the newest 8, then "+N older" (toggle checked live via AX); project docs; two-folder setup.
 - Upstream: Overseer PR https://github.com/mmnavarr/overseer/pull/3 (Remove project) open, awaiting the owner. Fork clone: `~/Developer/overseer`, branch `remove-project`. The fixed Overseer is installed in the user's Tern; backup of the previous copy in `/tmp/overseer-backup-*` (lost on reboot).
 
 ## Locked decisions
@@ -32,7 +32,8 @@ Updated 2026-11-04.
 | `AGENTS.md`, `PROJECT-STATE.md`, `HANDOFF.md` | CURRENT project docs |
 | `tern.d.luau` | generated, gitignored |
 | `~/Library/Application Support/Tern/plugin-data/session-folders` | SUPERSEDED kv from 0.1 (copied to `plugin-data/roost`) |
-| `~/Library/Application Support/Tern/plugins/roost.path` | link to this folder |
+| `~/Developer/tern-roost` | CURRENT live plugin copy (clone of this repo; remotes `dev`, `origin`) |
+| `~/Library/Application Support/Tern/plugins/roost.path` | link to `~/Developer/tern-roost` |
 
 ## Toolchain
 

@@ -6,21 +6,22 @@ Push the local commits to GitHub (`git push`), then retake `docs/panel.png` with
 
 ## Where things are
 
-- Source and docs: `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN` (git, remote `origin` = https://github.com/roverdude24/tern-roost, branch `main`). Moved here from `~/Developer/tern-roost` on 2026-11-04 at the user's request.
-- Live plugin: linked, so edits reload in Tern at once. `tern plugin list` shows `roost 0.2.0 … ready`.
+- Dev repo and docs: `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN` (git, remote `origin` = https://github.com/roverdude24/tern-roost, branch `main`).
+- Live plugin: `~/Developer/tern-roost`, a clone of the dev repo (remotes `dev` = drive copy, `origin` = GitHub), linked in Tern. `tern plugin list` shows `roost 0.2.0 … ready`. Sync after committing in the dev repo: `git -C ~/Developer/tern-roost pull dev main`.
 - User data: `~/Library/Application Support/Tern/plugin-data/roost/kv.json`.
 - Overseer contribution: `~/Developer/overseer` (fork of mmnavarr/overseer, branch `remove-project`), PR https://github.com/mmnavarr/overseer/pull/3.
 
 ## Reopen and rebuild
 
 ```sh
-cd "/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN"
+cd "/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN"   # develop here, commit
+git -C ~/Developer/tern-roost pull dev main               # update the live plugin
 T=/Applications/Tern.app/Contents/MacOS/tern
 $T plugin types .            # regenerate tern.d.luau (gitignored)
 $T plugin reload roost
 ```
 
-If the link is gone (or the drive was renamed): `$T plugin link "/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN"`.
+If the link is gone: `$T plugin link ~/Developer/tern-roost`. If `~/Developer/tern-roost` is missing: `git clone "/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN" ~/Developer/tern-roost` then link it.
 
 ## Reconnect tools
 
