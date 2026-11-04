@@ -1,15 +1,17 @@
-# Sessions
+# Roost
 
-A Tern plugin: a left panel listing every session, grouped by working folder, with quick actions to open and manage them. It works on any folder: nothing is read from, or needed in, a repository.
+A Tern plugin: a left panel where every session roosts, grouped by working folder. Folder badges, the agent harness each session runs, how long since it was last active, git branches and worktrees when a folder is a repository, and a Settled shelf for sessions you are done with. Any folder works; nothing needs a repository.
+
+![Roost](docs/panel.png)
 
 Forked from [mmnavarr/overseer](https://github.com/mmnavarr/overseer) (MIT, see `LICENSE`); the panel mechanics are Overseer's, the folder model is new.
 
 ## Install
 
-Needs the [Tern](https://docs.stencil.so/tern/) desktop app on macOS. Nothing else.
+Needs the [Tern](https://docs.stencil.so/tern/) desktop app on macOS. Git is optional.
 
 ```sh
-/Applications/Tern.app/Contents/MacOS/tern plugin install github.com/roverdude24/tern-session-folders
+/Applications/Tern.app/Contents/MacOS/tern plugin install github.com/roverdude24/tern-roost
 ```
 
 Or clone it and `tern plugin link "$PWD"` to run it from source (it reloads when files change).
@@ -18,17 +20,28 @@ Installs alongside Overseer with its own shortcut (Overseer is `⌘⌥⇧P`), bu
 
 ## Use
 
-- **Show or hide**: `⌘⌥⇧L`, or the palette command *Show or hide Sessions*, or the status-line segment. The panel follows the shown tab and remembers its width.
-- **Groups**: a session's folder is the working directory of its first tab (falling through to the next tab when the first has none). Unknown directories go under *Other*. Pinned folders always show, first, in the order pinned; a session inside a pinned folder is listed under the deepest one holding it. The rest follow by session count, then name. Headers collapse; the state is kept.
-- **Rows**: name, tab count, and a dot: grey idle, green pulsing while an agent works, blue while one waits for you. The current session is highlighted. Click to switch.
+Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the status-line segment. The panel follows the shown tab and remembers its width.
+
+**Folders.** A session lives under the working directory of its first tab (the next tab when the first has none). Each folder has a two-letter badge (first letter of its first and last word, or the first two letters of a single word) in a colour fixed by its path; the same badge sits on each session row. Unknown directories go under *Other*. Pinned folders always show, first, in the order pinned; a session inside a pinned folder, a repository or a worktree is listed under the deepest one holding it, with the subfolder dimmed beneath. The rest follow by session count, then name.
+
+**Rows.** Dot (grey idle, green pulsing while an agent works, blue while one waits for you), name, a harness icon (omp, Claude Code, Codex, Pi, Hermes, Gemini, OpenCode, Aider, else a terminal) and the time since the session was last active (`now`, `12m`, `4h`, `2d`, `31d`). Hover a row for its folder, host machine, harness and model. Within a folder the most recently active session comes first.
+
+**Activity.** Tern gives no timestamps, so Roost stamps a session whenever a command starts or finishes, an agent changes state, a title or directory changes, or you focus it. Sessions that predate Roost start from how long `tern inspect` says they have been quiet. Stamps are saved in the plugin's store.
+
+**Git.** When a folder is a git repository its header shows the branch, `✱` for uncommitted changes, `↑`/`↓` against its upstream, and the pull request number if `gh` is installed and finds one. Linked worktrees nest under their repository. Non-repositories look exactly as before.
+
+**Settled.** A collapsed *Settled* section at the bottom keeps sessions you are done with: name, folder, harness, model, host and last activity (newest first, up to 200). *Settle* in a row's menu closes its programs after confirming; any session that ends some other way lands there too. Idle sessions are never settled automatically. `↶` (or right-click › Restore) reopens a session in the same folder with the same name, running the same harness when known; right-click › Forget drops it.
 
 | Where | Action |
 | --- | --- |
-| Header | **Find** (pick by `name — folder`), **New** (pick a pinned or in-use folder, or browse), **Add folder** (pin), ↻ |
-| Folder | `+` new session there, `omp` new session whose first tab runs `omp`, ↗ reveal in Finder, 📌 pin or unpin (also right-click the header) |
-| Session (right-click) | Rename, New tab here, Lock or Unlock, Close (asks first; locked sessions are refused) |
-| Palette | Show or hide Sessions, Find session, New session in folder, Rename current session |
+| Header icons | Find session, New session (pick a pinned or in-use folder, or browse), Add folder (pin), Refresh |
+| Folder (hover) | pin, `+` new session, ✦ new session running `omp`, open in Finder |
+| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, New worktree session (repositories), Remove worktree (worktrees) |
+| Session (right-click) | Rename, New tab here, Lock or Unlock, Settle, Close |
+| Palette | Show or hide Roost, Roost: Find session, Roost: New session in folder, Roost: Rename current session |
+
+*New worktree session* asks for a branch name, runs `git worktree add` into a sibling folder (`<repo>-<branch>`) and opens a session there. *Remove worktree* refuses while the worktree has uncommitted changes or a session is open in it, and always keeps the branch.
 
 New tabs follow Settings › New tabs and splits open (shell or agent), like ⌘T.
 
-Pinned folders, collapsed state, panel width and open state live in the plugin's key-value store.
+Pinned folders, collapsed state, panel width, activity and Settled live in the plugin's key-value store.

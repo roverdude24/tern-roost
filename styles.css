@@ -1,24 +1,23 @@
 /* Panel runs a touch smaller than Tern's base; every other size is relative to it. */
-[data-role='sessions.panel'] {
+[data-role='roost.panel'] {
   gap: 10px;
   color: var(--t1);
   font-size: 0.93em;
 }
-[data-role='sessions.header'] {
+[data-role='roost.header'] {
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 2px;
   padding-bottom: 2px;
 }
-[data-role='sessions.heading'] {
+[data-role='roost.heading'] {
   font-weight: 650;
   color: var(--t1);
 }
-[data-role='sessions.titleGroup'] {
+[data-role='roost.titleGroup'] {
   align-items: center;
   gap: 6px;
 }
-[data-role='sessions.count'] {
+[data-role='roost.count'] {
   flex-shrink: 0;
   color: var(--t3);
   font-size: 0.8em;
@@ -26,37 +25,43 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--t4) 18%, transparent);
 }
-[data-role='sessions.folder'] {
+[data-role='roost.folder'],
+[data-role='roost.worktree'],
+[data-role='roost.settled'] {
   gap: 2px;
   padding-bottom: 4px;
 }
-[data-role='sessions.folderHeader'] {
+[data-role='roost.worktree'] {
+  margin-left: 12px;
+}
+[data-role='roost.folderHeader'],
+[data-role='roost.settledHeader'] {
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding-bottom: 2px;
 }
 /* The folder's name always shows whole; its parent path is what gets cut. */
-[data-role='sessions.folderToggle'] {
+[data-role='roost.folderToggle'] {
   display: flex;
-  align-items: baseline;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   flex: 0 1 auto;
   min-width: 0;
   color: var(--t1);
   font: inherit;
-  padding: 4px 6px 4px 2px;
+  padding: 3px 6px 3px 2px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   text-align: left;
   cursor: pointer;
 }
-[data-role='sessions.caret'] {
+[data-role='roost.caret'] {
   flex-shrink: 0;
   color: var(--t3);
   width: 12px;
 }
-[data-role='sessions.folderParent'] {
+[data-role='roost.folderParent'] {
   flex-shrink: 1;
   min-width: 0;
   color: var(--t3);
@@ -64,156 +69,201 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-[data-role='sessions.folderName'] {
+[data-role='roost.folderName'] {
   flex-shrink: 0;
   font-weight: 650;
   white-space: nowrap;
 }
+/* Folder badge: two initials on a colour that stays with the folder. */
+[data-role^='roost.badge'] {
+  flex-shrink: 0;
+  min-width: 22px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+[data-role='roost.badge1'] { color: #e5484d; background: color-mix(in srgb, #e5484d 18%, transparent); }
+[data-role='roost.badge2'] { color: #f76b15; background: color-mix(in srgb, #f76b15 18%, transparent); }
+[data-role='roost.badge3'] { color: #d6a100; background: color-mix(in srgb, #d6a100 18%, transparent); }
+[data-role='roost.badge4'] { color: #46a758; background: color-mix(in srgb, #46a758 18%, transparent); }
+[data-role='roost.badge5'] { color: #12a594; background: color-mix(in srgb, #12a594 18%, transparent); }
+[data-role='roost.badge6'] { color: #3e63dd; background: color-mix(in srgb, #3e63dd 18%, transparent); }
+[data-role='roost.badge7'] { color: #6e56cf; background: color-mix(in srgb, #6e56cf 18%, transparent); }
+[data-role='roost.badge8'] { color: #d6409f; background: color-mix(in srgb, #d6409f 18%, transparent); }
+/* Right-aligned age: time since the session's last activity. */
+[data-role='roost.age'] {
+  flex-shrink: 0;
+  min-width: 26px;
+  text-align: right;
+  color: var(--t3);
+  font-size: 0.82em;
+  white-space: nowrap;
+}
 /* A session row: highlighted when it is the current session. */
-[data-role='sessions.session'] {
+[data-role='roost.session'] {
   gap: 0;
   padding: 1px 4px;
   border: 1px solid transparent;
   border-radius: 10px;
   margin-left: 12px;
 }
-[data-role='sessions.session']:hover {
+[data-role='roost.session']:hover {
   background: color-mix(in srgb, var(--t4) 7%, transparent);
 }
-[data-role='sessions.session'][data-mark='pick'] {
+[data-role='roost.session'][data-mark='pick'] {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
-[data-role='sessions.row'] {
+[data-role='roost.row'] {
   gap: 1px;
   padding: 4px 8px;
   border-radius: 7px;
   cursor: pointer;
 }
-[data-role='sessions.head'] {
+[data-role='roost.head'] {
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
-[data-role='sessions.name'] {
+[data-role='roost.name'] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
 }
-[data-role='sessions.sub'] {
+[data-role='roost.sub'] {
   color: var(--t3);
   font-size: 0.82em;
-  padding-left: 16px;
+  padding-left: 40px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-[data-role='sessions.badge'] {
-  flex-shrink: 0;
-  font-size: 0.75em;
-  padding: 1px 6px;
-  border-radius: 999px;
-  color: var(--t3);
-  background: color-mix(in srgb, var(--t4) 18%, transparent);
-  white-space: nowrap;
-}
-[data-role='sessions.lockMark'] {
+[data-role='roost.lockMark'] {
   flex-shrink: 0;
   font-size: 0.8em;
 }
 /* Status dot: grey idle, green pulsing while an agent works, blue when one waits for you. */
-[data-role='sessions.dotIdle'],
-[data-role='sessions.dotAgent'],
-[data-role='sessions.dotWaiting'] {
+[data-role='roost.dotIdle'],
+[data-role='roost.dotAgent'],
+[data-role='roost.dotWaiting'] {
   width: 8px;
   height: 8px;
   min-width: 8px;
   border-radius: 50%;
 }
-[data-role='sessions.dotIdle'] {
+[data-role='roost.dotIdle'] {
   background: var(--t4);
 }
-[data-role='sessions.dotAgent'] {
+[data-role='roost.dotAgent'] {
   background: var(--ok);
-  animation: sessions-agent-pulse 1.6s ease-out infinite;
+  animation: roost-agent-pulse 1.6s ease-out infinite;
 }
-@keyframes sessions-agent-pulse {
+@keyframes roost-agent-pulse {
   from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 70%, transparent); }
   to { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 0%, transparent); }
 }
-[data-role='sessions.dotWaiting'] {
-  background: #4493f8;
+[data-role='roost.dotWaiting'] {
   background: light-dark(#0969da, #4493f8);
   box-shadow: 0 0 0 3px color-mix(in srgb, #4493f8 35%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-role='sessions.dotAgent'] {
+  [data-role='roost.dotAgent'] {
     animation: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 35%, transparent);
   }
 }
-/* ↻ during an explicit refresh. */
-[data-role='sessions.refreshGlyph'],
-[data-role='sessions.refreshGlyphSpin'] {
-  display: inline-block;
+/* Icon buttons: header, folder actions, harness mark. */
+[data-role='roost.iconButton'],
+[data-role='roost.hoverAct'],
+[data-role='roost.pinOn'],
+[data-role='roost.harness'],
+[data-role='roost.gitIcon'] {
+  flex-shrink: 0;
+  color: var(--t3);
 }
-[data-role='sessions.refreshGlyphSpin'] {
-  animation: sessions-spin 0.8s linear infinite;
+[data-role='roost.iconButton']:hover,
+[data-role='roost.hoverAct']:hover,
+[data-role='roost.pinOn']:hover,
+[data-role='roost.harness']:hover {
+  color: var(--t1);
 }
-@keyframes sessions-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+[data-role='roost.pinOn'] {
+  color: var(--accent);
 }
-@media (prefers-reduced-motion: reduce) {
-  [data-role='sessions.refreshGlyphSpin'] {
-    animation: none;
-    opacity: 0.5;
-  }
+[data-role='roost.gitIcon'] {
+  pointer-events: none;
 }
-[data-role='sessions.hint'] {
+/* Folder actions stay out of the way until the header is hovered or focused. */
+[data-role='roost.hoverAct'] {
+  opacity: 0;
+}
+[data-role='roost.folderHeader']:hover [data-role='roost.hoverAct'],
+[data-role='roost.folderHeader']:focus-within [data-role='roost.hoverAct'] {
+  opacity: 1;
+}
+/* Branch, dirty mark, ahead/behind and pull request under a folder's name. */
+[data-role='roost.gitLine'] {
+  align-items: center;
+  gap: 6px;
+  padding-left: 18px;
+  color: var(--t3);
+  font-size: 0.85em;
+}
+[data-role='roost.gitBranch'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='roost.dirty'] {
+  flex-shrink: 0;
+  color: var(--warn);
+  font-weight: 700;
+}
+[data-role='roost.gitDiv'] {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+[data-role='roost.pr'] {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+/* Settled: collapsed by default, rows dimmed. */
+[data-role='roost.settledRow'] {
+  margin-left: 12px;
+  padding: 0 4px;
+  opacity: 0.6;
+}
+[data-role='roost.settledRow']:hover {
+  opacity: 1;
+}
+[data-role='roost.settledHead'] {
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+  border-radius: 7px;
+}
+[data-role='roost.settledName'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-role='roost.hint'] {
   color: var(--t3);
   font-size: 0.9em;
   padding: 2px 8px 2px 28px;
 }
-[data-role='sessions.button'],
-[data-role='sessions.iconButton'],
-[data-role='sessions.iconButtonOn'] {
-  flex-shrink: 0;
-  color: var(--t2);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--t4) 30%, transparent);
-  border-radius: 6px;
-  padding: 4px 9px;
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.9em;
-}
-[data-role='sessions.iconButton'],
-[data-role='sessions.iconButtonOn'] {
-  padding: 4px 8px;
-}
-/* The per-folder buttons: sized to match the session count beside them. */
-[data-role='sessions.folderHeader'] [data-role='sessions.iconButton'],
-[data-role='sessions.folderHeader'] [data-role='sessions.iconButtonOn'] {
-  padding: 0 5px;
-  font-size: 0.8em;
-  line-height: 16px;
-  border-radius: 5px;
-}
-/* A toggle that is on, e.g. a pinned folder. */
-[data-role='sessions.iconButtonOn'] {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-[data-role='sessions.button']:hover,
-[data-role='sessions.iconButton']:hover,
-[data-role='sessions.iconButtonOn']:hover,
-[data-role='sessions.folderToggle']:hover {
+[data-role='roost.folderToggle']:hover {
   color: var(--t1);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
-[data-role^='sessions.']:focus-visible {
+[data-role^='roost.']:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

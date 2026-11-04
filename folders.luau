@@ -1,5 +1,5 @@
 --!nonstrict
--- Path helpers for the Sessions panel: plain strings and no tern API, so the
+-- Path, label and time helpers for Roost: plain values and no tern API, so the
 -- self-check at the bottom runs the moment the plugin loads.
 local Folders = {}
 
@@ -7,11 +7,24 @@ local Folders = {}
 -- path, so it can never collide with a real folder.
 Folders.OTHER = "Other"
 
+-- macOS spells /tmp, /var and /etc as /private/...; tools disagree about which,
+-- so every path is held in the short form.
+local function canon(path)
+	for _, top in { "/tmp", "/var", "/etc" } do
+		local prefix = "/private" .. top
+		if path == prefix or string.sub(path, 1, #prefix + 1) == prefix .. "/" then
+			return string.sub(path, 9)
+		end
+	end
+	return path
+end
+
 -- Strips trailing slashes ("/" stays); anything but a nonempty string gives "".
 function Folders.norm(path)
 	if type(path) ~= "string" or path == "" then return "" end
 	local trimmed = string.gsub(path, "/+$", "")
-	return if trimmed == "" then "/" else trimmed
+	if trimmed == "" then return "/" end
+	return canon(trimmed)
 end
 
 function Folders.basename(path)
@@ -33,10 +46,10 @@ function Folders.within(path, folder)
 	return path == folder or string.sub(path, 1, #prefix) == prefix
 end
 
--- The deepest of `pinned` that holds `path`, else `path` itself.
-function Folders.owner(path, pinned)
+-- The deepest of `owners` that holds `path`, else `path` itself.
+function Folders.owner(path, owners)
 	local best, length = path, -1
-	for _, folder in pinned do
+	for _, folder in owners do
 		if #folder > length and Folders.within(path, folder) then best, length = folder, #folder end
 	end
 	return best
@@ -55,6 +68,22 @@ function Folders.hex(value)
 	end))
 end
 
+function Folders.unhex(hex)
+	if not hex or #hex % 2 ~= 0 or string.find(hex, "%X") then return nil end
+	return (string.gsub(hex, "..", function(byte)
+		return string.char(tonumber(byte, 16))
+	end))
+end
+
+-- Time since `seconds` ago, as "now", "12m", "4h" or "31d".
+function Folders.age(seconds)
+	if seconds == nil then return "" end
+	if seconds < 60 then return "now" end
+	if seconds < 3600 then return tostring(math.floor(seconds / 60)) .. "m" end
+	if seconds < 86400 then return tostring(math.floor(seconds / 3600)) .. "h" end
+	return tostring(math.floor(seconds / 86400)) .. "d"
+end
+
 -- A folder's label in two parts: its dimmed parent (trailing slash included, may
 -- be cut to fit) and its name, which always stays whole: "~/exo" → "~/", "exo".
 function Folders.parts(path, home)
@@ -64,14 +93,8 @@ function Folders.parts(path, home)
 	return prefix, name
 end
 
-function Folders.unhex(hex)
-	if not hex or #hex % 2 ~= 0 or string.find(hex, "%X") then return nil end
-	return (string.gsub(hex, "..", function(byte)
-		return string.char(tonumber(byte, 16))
-	end))
-end
-
 assert(Folders.norm("/a/b//") == "/a/b" and Folders.norm("///") == "/" and Folders.norm(nil) == "")
+assert(Folders.norm("/private/tmp/x/") == "/tmp/x" and Folders.norm("/private/tmpx") == "/private/tmpx")
 assert(Folders.basename("/Volumes/VINH MAC/it's here/") == "it's here")
 assert(Folders.short("/Users/v/exo", "/Users/v") == "~/exo" and Folders.short("/Users/v", "/Users/v") == "~")
 assert(Folders.short("/Users/vv", "/Users/v") == "/Users/vv")
@@ -80,6 +103,7 @@ assert(Folders.owner("/p/a/b", { "/p/a", "/p", "/q" }) == "/p/a" and Folders.own
 assert(Folders.owner("/p", { "/", "/p" }) == "/p")
 assert(Folders.relative("/p/a/b", "/p") == "a/b" and Folders.relative("/a", "/") == "a")
 assert(Folders.unhex(Folders.hex("/tmp/sf-test dir/it's here")) == "/tmp/sf-test dir/it's here")
+assert(Folders.unhex("zz") == nil and Folders.unhex("abc") == nil)
 do
 	local a, b = Folders.parts("/Users/v/exo", "/Users/v")
 	assert(a == "~/" and b == "exo")
@@ -90,5 +114,7 @@ do
 	a, b = Folders.parts("/Users/v", "/Users/v")
 	assert(a == "" and b == "~")
 end
+assert(Folders.age(5) == "now" and Folders.age(720) == "12m" and Folders.age(4 * 3600 + 5) == "4h")
+assert(Folders.age(2 * 86400) == "2d" and Folders.age(31 * 86400 + 9) == "31d" and Folders.age(nil) == "")
 
 return Folders
