@@ -782,6 +782,37 @@ local function renameSession(cx, id)
 		end)
 end
 
+-- ── Auto-naming ─────────────────────────────────────────────────────────
+-- A session still named after its folder (Tern's and Roost's default) takes its
+-- agent's pane title, e.g. omp's "OMNI: Evaluate repos", and follows it as the
+-- title changes. kv "titled": session id → the name Roost gave it, or false once
+-- the user renamed it (then Roost leaves it alone).
+local function autoName(cx)
+	local titled = records("titled")
+	local cwds = sessionCwds(cx)
+	local current = cx.sessions:current()
+	local changed, live = false, {}
+	for _, session in cx.sessions:list() do
+		local key = tostring(session.id)
+		live[key] = true
+		local mine = titled[key]
+		if mine and mine ~= session.name then mine = false; titled[key] = false; changed = true end
+		local cwd = cwds[key]
+		if session.host == current.host and mine ~= false and (mine or (cwd and session.name == Folders.basename(cwd))) then
+			local title = Harness.detect(cx, session.id).title
+			if title and title ~= session.name then
+				local ok, err = pcall(function() cx.sessions:rename(session.id, title) end)
+				if ok then titled[key] = title; changed = true
+				else tern.log.warn("Roost auto-name failed: " .. tostring(err)) end
+			end
+		end
+	end
+	for key in titled do
+		if not live[key] then titled[key] = nil; changed = true end
+	end
+	if changed then tern.kv.set("titled", titled) end
+end
+
 local function setLocked(cx, id, locked)
 	local ok, err = pcall(function()
 		if locked then cx.sessions:lock(id) else cx.sessions:unlock(id) end
@@ -1171,6 +1202,7 @@ local function tick(cx)
 		if not localHost(cx) then return end
 		follow(cx)
 		seedActivity(cx)
+		autoName(cx)
 		if slot(cx) then
 			local data, live = viewData(cx)
 			refreshGit(cx, shownPaths(data))

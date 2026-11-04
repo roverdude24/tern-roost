@@ -112,8 +112,25 @@ local function sessionPanes(cx, sessionId)
 	return panes
 end
 
-local function describe(kind, state, model, pane)
-	return { kind = kind, label = LABELS[kind], model = model, icon = ICONS[kind], state = state, pane = pane }
+local function describe(kind, state, model, pane, title)
+	return { kind = kind, label = LABELS[kind], model = model, icon = ICONS[kind], state = state, pane = pane, title = title }
+end
+
+-- A pane title worth naming a session after, e.g. omp's "<icon> OMNI: Evaluate repos" -> "OMNI: Evaluate repos".
+-- Leading icons and spinners go (Nerd Font glyphs, Claude's ✳, braille); nil for a path or the program's own name.
+function Harness.title(raw, kind)
+	raw = str(raw)
+	if not raw then return nil end
+	local start = #raw + 1
+	for pos, cp in utf8.codes(raw) do
+		local icon = cp == 32 or cp == 9 or (cp >= 0x2000 and cp < 0x3000) or (cp >= 0xE000 and cp <= 0xF8FF) or cp >= 0x1F000
+		if not icon then start = pos; break end
+	end
+	local text = string.match(string.sub(raw, start), "^(.-)%s*$")
+	if text == "" or string.find(text, "^[/~]") then return nil end
+	local lower = string.lower(text)
+	if KINDS[lower] or lower == string.lower(LABELS[kind] or "") then return nil end
+	return text
 end
 
 -- The most relevant agent in a session: working beats waiting beats idle; native agent
@@ -136,7 +153,7 @@ function Harness.detect(cx, sessionId)
 					or kindOfLine(str(agent.program)) or kindOfLine(str(pane.program)) or kindOfLine(str(pane.title))
 					or "omp" -- an unnamed native agent block is omp
 				local state = STATES[agent.state] or "idle"
-				consider(describe(kind, state, Harness.prettyModel(agent.model), agent.pane), state, true)
+				consider(describe(kind, state, Harness.prettyModel(agent.model), agent.pane, Harness.title(pane.title, kind)), state, true)
 			end
 		end
 		for id, pane in panes do
@@ -144,7 +161,7 @@ function Harness.detect(cx, sessionId)
 				local kind = kindOfLine(pane.running and pane.running.line) or kindOfLine(str(pane.program))
 				if kind then
 					local state = if pane.busy and pane.running then "working" else "idle"
-					consider(describe(kind, state, nil, id), state, false)
+					consider(describe(kind, state, nil, id, Harness.title(pane.title, kind)), state, false)
 				end
 			end
 		end
@@ -214,5 +231,8 @@ assert(Harness.prettyModel("Opus 5.5") == "Opus 5.5" and Harness.prettyModel("")
 assert(Harness.prettyModel("llama-3-70b:latest") == "Llama 3 70B" and Harness.prettyModel("grok-4.6") == "Grok 4.6")
 assert(kindOfLine("cd x && FOO=1 /usr/local/bin/claude --resume") == "claude" and kindOfLine("ls omp") == nil and kindOfLine(nil) == nil)
 assert(Harness.launchCommand("omp") == "omp" and Harness.launchCommand("shell") == nil and Harness.launchCommand("x") == nil)
+assert(Harness.title("\u{F0D9A} OMNI: Evaluate repos", "omp") == "OMNI: Evaluate repos" and Harness.title("✳ Fix login", "claude") == "Fix login")
+assert(Harness.title("omp", "omp") == nil and Harness.title("✳ Claude Code", "claude") == nil and Harness.title("~/src", "omp") == nil)
+assert(Harness.title("Đổi tên phiên", "omp") == "Đổi tên phiên" and Harness.title(nil, "omp") == nil and Harness.title("  ", "omp") == nil)
 
 return Harness
