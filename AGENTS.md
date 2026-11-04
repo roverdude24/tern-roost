@@ -4,7 +4,7 @@ Tern plugin (Luau, window side only): a left panel of every Tern session grouped
 
 ## Rules
 
-- Work in `~/Developer/tern-roost`. It is linked into Tern (`tern plugin link`), so every saved file reloads the live plugin in the user's window.
+- Work in `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN` (external drive; the user's chosen home for this repo). It is linked into Tern (`tern plugin link`), so every saved file reloads the live plugin in the user's window. If the drive is unplugged, Roost fails to load until it is back.
 - Git is optional, never required: non-git folders must behave exactly like v0.1. No Worktrunk, no `gh` dependency (`gh` only adds a PR badge when present).
 - Paths can hold spaces, apostrophes, non-ASCII and live on `/Volumes/...`. Test with such a path.
 - Never close, rename or switch the user's real sessions while testing. Test sessions are prefixed `rt-test`; delete them and any `/tmp/rt-*` folders afterwards.

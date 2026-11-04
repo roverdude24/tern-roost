@@ -4,8 +4,8 @@ Updated 2026-11-04.
 
 ## Status
 
-- Roost 0.2.0 is published (https://github.com/roverdude24/tern-roost) and linked live in the user's Tern 0.9.11 from this folder.
-- Unreleased in the working tree: Settled moved into the canvas dock so it stays pinned to the panel's bottom edge (user request "have settled as the bottom"); shows the newest 8, then "+N older". Toggle checked live via AX.
+- Roost 0.2.0 is published (https://github.com/roverdude24/tern-roost) and linked live in the user's Tern 0.9.11 from this folder: `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN`.
+- Local commits not yet pushed: Settled moved into the canvas dock so it stays pinned to the panel's bottom edge (user request "have settled as the bottom"), shows the newest 8, then "+N older" (toggle checked live via AX); project docs; repo move.
 - Upstream: Overseer PR https://github.com/mmnavarr/overseer/pull/3 (Remove project) open, awaiting the owner. Fork clone: `~/Developer/overseer`, branch `remove-project`. The fixed Overseer is installed in the user's Tern; backup of the previous copy in `/tmp/overseer-backup-*` (lost on reboot).
 
 ## Locked decisions
@@ -19,7 +19,6 @@ Updated 2026-11-04.
 
 ## Open decisions
 
-- Where the user wants the repo for future development: asked "set the repo to be in this folder"; the session's folder is `/tmp`, which macOS clears. Repo kept at `~/Developer/tern-roost` until the user confirms.
 - Roost and Overseer's Projects panel open together share one narrow left column. Fix, or leave "show one at a time"?
 - Settled list paging beyond 8 rows in the dock.
 
@@ -43,7 +42,7 @@ Updated 2026-11-04.
 
 ## Next steps
 
-1. Confirm the repo location with the user (see Open decisions).
-2. Commit and push the dock change; refresh `docs/panel.png` showing Settled at the bottom.
+1. Push to GitHub.
+2. Refresh `docs/panel.png` showing Settled at the bottom.
 3. Untested paths to exercise: restore a settled omp/claude session, PR badge on a repo with a GitHub remote, ages of days, Add folder after 0.2.
 4. Watch Overseer PR #3; delete `plugin-data/session-folders` once the user agrees.

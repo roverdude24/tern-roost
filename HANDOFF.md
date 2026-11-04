@@ -2,11 +2,11 @@
 
 ## Next action
 
-Ask the user where the repo should live (the request named "this folder", i.e. `/tmp`, which macOS clears on reboot). Then commit and push the Settled-in-dock change (`view.luau`, `window.luau`, `CHANGELOG.md`).
+Push the local commits to GitHub (`git push`), then retake `docs/panel.png` with Settled at the bottom.
 
 ## Where things are
 
-- Source and docs: `~/Developer/tern-roost` (git, remote `origin` = https://github.com/roverdude24/tern-roost, branch `main`).
+- Source and docs: `/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN` (git, remote `origin` = https://github.com/roverdude24/tern-roost, branch `main`). Moved here from `~/Developer/tern-roost` on 2026-11-04 at the user's request.
 - Live plugin: linked, so edits reload in Tern at once. `tern plugin list` shows `roost 0.2.0 … ready`.
 - User data: `~/Library/Application Support/Tern/plugin-data/roost/kv.json`.
 - Overseer contribution: `~/Developer/overseer` (fork of mmnavarr/overseer, branch `remove-project`), PR https://github.com/mmnavarr/overseer/pull/3.
@@ -14,13 +14,13 @@ Ask the user where the repo should live (the request named "this folder", i.e. `
 ## Reopen and rebuild
 
 ```sh
-cd ~/Developer/tern-roost
+cd "/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN"
 T=/Applications/Tern.app/Contents/MacOS/tern
 $T plugin types .            # regenerate tern.d.luau (gitignored)
 $T plugin reload roost
 ```
 
-If the link is gone: `$T plugin link ~/Developer/tern-roost`.
+If the link is gone (or the drive was renamed): `$T plugin link "/Volumes/VINH MAC/VINH's WORKS/TERN ROOST PLUGIN"`.
 
 ## Reconnect tools
 
@@ -29,6 +29,5 @@ If the link is gone: `$T plugin link ~/Developer/tern-roost`.
 
 ## Open questions for the user
 
-- Repo location: keep `~/Developer/tern-roost`, or move elsewhere?
 - Fix the shared-column squeeze when Roost and Overseer's panel are both open?
 - Delete the old `plugin-data/session-folders` kv?
