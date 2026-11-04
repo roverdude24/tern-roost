@@ -14,7 +14,7 @@ Needs the [Tern](https://docs.stencil.so/tern/) desktop app on macOS. Nothing el
 
 Or clone it and `tern plugin link "$PWD"` to run it from source (it reloads when files change).
 
-It sits fine beside Overseer: different panel, different shortcut (Overseer is `⌘⌥⇧P`).
+Installs alongside Overseer with its own shortcut (Overseer is `⌘⌥⇧P`), but both panels open at once split one left column between them; show one at a time.
 
 ## Use
 
