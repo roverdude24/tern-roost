@@ -1,0 +1,8 @@
+schema = 1
+id = "session-folders"
+name = "Sessions"
+version = "0.1.0"
+description = "A left panel listing every Tern session grouped by working folder, with quick actions to open and manage them. Any folder works; no repository needed."
+icon = "folder"
+window = "window.luau"
+styles = ["styles.css"]
