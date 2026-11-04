@@ -214,6 +214,8 @@ local function settledNode(row)
 	})
 end
 
+local SETTLED_SHOWN = 8
+
 local function settledSection(settled)
 	local title = (if settled.open then "Collapse" else "Expand") .. " Settled"
 	local children = {
@@ -229,8 +231,14 @@ local function settledSection(settled)
 		}),
 	}
 	if settled.open then
-		for _, row in ipairs(settled.rows) do table.insert(children, settledNode(row)) end
-		if #settled.rows == 0 then
+		-- shortcut: the dock does not scroll, so it shows the newest SETTLED_SHOWN; add paging if users keep more.
+		for index, row in ipairs(settled.rows) do
+			if index > SETTLED_SHOWN then break end
+			table.insert(children, settledNode(row))
+		end
+		if #settled.rows > SETTLED_SHOWN then
+			table.insert(children, text("more", "+" .. (#settled.rows - SETTLED_SHOWN) .. " older", "roost.hint"))
+		elseif #settled.rows == 0 then
 			table.insert(children, text("empty", "Nothing settled yet · right-click a session › Settle", "roost.hint"))
 		end
 	end
@@ -254,8 +262,12 @@ function View.render(model)
 	for _, group in ipairs(model.groups) do
 		table.insert(children, folderNode(group))
 	end
-	table.insert(children, settledSection(model.settled))
 	return ui.node("col", { key = "roost", role = "roost.panel" }, children)
+end
+
+-- Settled lives in the canvas dock, so it stays pinned to the panel's bottom edge.
+function View.dock(model)
+	return settledSection(model.settled)
 end
 
 return View

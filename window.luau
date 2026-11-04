@@ -488,7 +488,7 @@ local function draw(cx)
 	local data = viewData(cx)
 	local signature = tern.json.encode(data)
 	if rendered[pane] == signature then return end
-	cx.canvas:set(pane, { view = view.render(data) })
+	cx.canvas:set(pane, { view = view.render(data), dock = view.dock(data) })
 	rendered[pane] = signature
 end
 
@@ -606,7 +606,7 @@ local function openPanel(cx, tab)
 	local data = viewData(cx)
 	local pane, err = cx.canvas:open({
 		title = NAVIGATOR.title, about = NAVIGATOR.about,
-		view = view.render(data), how = "beside", focus = false,
+		view = view.render(data), dock = view.dock(data), how = "beside", focus = false,
 	})
 	if not pane then report(cx, err or "Could not open the Roost panel"); return nil end
 	slotPane = pane

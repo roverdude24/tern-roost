@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- *Settled* sits at the bottom of the panel (the canvas dock) instead of after the folder list. When open it shows the newest 8, then "+N older".
+
 ## 0.2.0
 
 Renamed from Sessions to **Roost** (plugin id `roost`, canvas title "Roost") so it is never confused with Tern's own Sessions. Existing pinned folders and settings move by copying `plugin-data/session-folders` to `plugin-data/roost`.
