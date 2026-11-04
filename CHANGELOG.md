@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.5
+
 ### Added
 
 - Sessions still named after their folder take their agent's title (omp's `OMNI: Evaluate repos`, Claude Code's task title), icon stripped, and follow it as it changes. A name you give a session yourself is kept.
