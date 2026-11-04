@@ -26,6 +26,8 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 **Rows.** Dot (grey idle, green pulsing while an agent works, blue while one waits for you), name, a harness icon (omp, Claude Code, Codex, Pi, Hermes, Gemini, OpenCode, Aider, else a terminal) and the time since the session was last active (`now`, `12m`, `4h`, `2d`, `31d`). Hover a row for its folder, host machine, harness and model. Within a folder the most recently active session comes first.
 
+**Names.** A session still named after its folder (the name Tern and Roost give a new one) takes the title its agent sets, minus the leading icon, so omp's `OMNI: Evaluate openomni and omniget repos` becomes the session's name, in the panel and in Tern's tab bar alike. It follows the title as the agent retitles. Rename a session yourself (in Roost or Tern) and Roost leaves that name alone.
+
 **Activity.** Tern gives no timestamps, so Roost stamps a session whenever a command starts or finishes, an agent changes state, a title or directory changes, or you focus it. Sessions that predate Roost start from how long `tern inspect` says they have been quiet. Stamps are saved in the plugin's store.
 
 **Git.** When a folder is a git repository its header shows the branch, `✱` for uncommitted changes, `↑`/`↓` against its upstream, and the pull request number if `gh` is installed and finds one. Linked worktrees nest under their repository. Non-repositories look exactly as before.
