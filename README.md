@@ -2,7 +2,7 @@
 
 A Tern plugin: a left panel where every session roosts, grouped by working folder. Folder badges, the agent harness each session runs, how long since it was last active, git branches and worktrees when a folder is a repository, and a Settled shelf for sessions you are done with. Any folder works; nothing needs a repository.
 
-![Roost](docs/panel.png)
+![Roost](docs/panel-0.2.5.png)
 
 Forked from [mmnavarr/overseer](https://github.com/mmnavarr/overseer) (MIT, see `LICENSE`); the panel mechanics are Overseer's, the folder model is new.
 
