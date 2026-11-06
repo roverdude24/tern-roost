@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Narrow panels: folder names end in `…` instead of spilling off the left edge, and the folder path, then the harness icon give way to session names. Folder buttons and Settled's `↶` take no room until hovered (the right-click menu still has them). Session rows drop the folder badge their folder header already shows.
+- Git no longer takes a line under each repository folder: its marks sit in the folder header (`●` uncommitted, `↑2`, `#12`), the branch shows only when it is not `main`/`master`, and the header tooltip lists it all.
 
 ## 0.2.5
 

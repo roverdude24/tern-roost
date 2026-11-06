@@ -30,7 +30,7 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 **Activity.** Tern gives no timestamps, so Roost stamps a session whenever a command starts or finishes, an agent changes state, a title or directory changes, or you focus it. Sessions that predate Roost start from how long `tern inspect` says they have been quiet. Stamps are saved in the plugin's store.
 
-**Git.** When a folder is a git repository its header shows the branch, `✱` for uncommitted changes, `↑`/`↓` against its upstream, and the pull request number if `gh` is installed and finds one. Linked worktrees nest under their repository. Non-repositories look exactly as before.
+**Git.** When a folder is a git repository its header carries small marks on the right: the branch when it is not `main`/`master`, an amber `●` for uncommitted changes, `↑`/`↓` against its upstream, and the pull request number if `gh` is installed and finds one. Hover the header for all of it in words. Linked worktrees nest under their repository. Non-repositories look exactly as before.
 
 **Settled.** A collapsed *Settled* section at the bottom keeps sessions you are done with: name, folder, harness, model, host and last activity (newest first, up to 200). *Settle* in a row's menu closes its programs after confirming; any session that ends some other way lands there too. Idle sessions are never settled automatically. `↶` (on hover, or right-click › Restore) reopens a session in the same folder with the same name, running the same harness when known; right-click › Forget drops it.
 
