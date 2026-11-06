@@ -1,7 +1,7 @@
 schema = 1
 id = "roost"
 name = "Roost"
-version = "0.2.5"
+version = "0.2.6"
 description = "A left panel where every Tern session roosts, grouped by folder: badges, harness, age, git branches and worktrees, and a Settled shelf. Any folder works; no repository needed."
 icon = "folder"
 window = "window.luau"
