@@ -305,12 +305,11 @@ local function model(cx)
 			local at = lastActive[key] or now
 			local hostName = Harness.host(cx, session.host) or "local"
 			local where = if cwd then Folders.short(cwd, home) else Folders.OTHER
-			local badge, role = badgeOf(entry.path)
 			table.insert(entry.sessions, {
 				id = session.id, name = session.name, tabs = session.tabs, locked = session.locked,
 				current = session.current, agent = agent, sub = sub, where = where, host = hostName,
 				harness = { kind = harness.kind, label = harness.label, icon = harness.icon, model = harness.model },
-				at = at, age = Folders.age(math.max(0, now - at)), badge = badge, role = role,
+				at = at, age = Folders.age(math.max(0, now - at)),
 			})
 			if at > entry.newest then entry.newest = at end
 			known[key] = {

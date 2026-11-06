@@ -40,7 +40,7 @@
   gap: 4px;
   padding-bottom: 2px;
 }
-/* The folder's name always shows whole; its parent path is what gets cut. */
+/* When room runs out the parent path goes first, then the name gets an ellipsis. */
 [data-role='roost.folderToggle'] {
   display: flex;
   align-items: center;
@@ -62,7 +62,7 @@
   width: 12px;
 }
 [data-role='roost.folderParent'] {
-  flex-shrink: 1;
+  flex: 0 1000 auto;
   min-width: 0;
   color: var(--t3);
   overflow: hidden;
@@ -70,7 +70,10 @@
   white-space: nowrap;
 }
 [data-role='roost.folderName'] {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -138,7 +141,7 @@
 [data-role='roost.sub'] {
   color: var(--t3);
   font-size: 0.82em;
-  padding-left: 40px;
+  padding-left: 15px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -180,14 +183,22 @@
 /* Icon buttons: header, folder actions, harness mark. */
 [data-role='roost.iconButton'],
 [data-role='roost.hoverAct'],
+[data-role='roost.restore'],
 [data-role='roost.pinOn'],
-[data-role='roost.harness'],
 [data-role='roost.gitIcon'] {
   flex-shrink: 0;
   color: var(--t3);
 }
+/* The harness mark gives way to the session name in a narrow panel; its tooltip says the same. */
+[data-role='roost.harness'] {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t3);
+}
 [data-role='roost.iconButton']:hover,
 [data-role='roost.hoverAct']:hover,
+[data-role='roost.restore']:hover,
 [data-role='roost.pinOn']:hover,
 [data-role='roost.harness']:hover {
   color: var(--t1);
@@ -198,13 +209,16 @@
 [data-role='roost.gitIcon'] {
   pointer-events: none;
 }
-/* Folder actions stay out of the way until the header is hovered or focused. */
-[data-role='roost.hoverAct'] {
-  opacity: 0;
+/* Row actions take no room until hovered or focused; the right-click menu has them too. */
+[data-role='roost.hoverAct'],
+[data-role='roost.restore'] {
+  display: none;
 }
 [data-role='roost.folderHeader']:hover [data-role='roost.hoverAct'],
-[data-role='roost.folderHeader']:focus-within [data-role='roost.hoverAct'] {
-  opacity: 1;
+[data-role='roost.folderHeader']:focus-within [data-role='roost.hoverAct'],
+[data-role='roost.settledHead']:hover [data-role='roost.restore'],
+[data-role='roost.settledHead']:focus-within [data-role='roost.restore'] {
+  display: flex;
 }
 /* Branch, dirty mark, ahead/behind and pull request under a folder's name. */
 [data-role='roost.gitLine'] {
@@ -266,35 +280,4 @@
 [data-role^='roost.']:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-/* Narrow panel: drop what the tooltip and right-click menu already carry, so names get the room. */
-[data-role='roost.panel'],
-[data-role='roost.settled'] {
-  container-type: inline-size;
-}
-@container (max-width: 300px) {
-  [data-role='roost.hoverAct'],
-  [data-role='roost.harness'],
-  [data-role='roost.folderParent'],
-  [data-role='roost.head'] [data-role^='roost.badge'],
-  [data-role='roost.settledHead'] [data-role^='roost.badge'] {
-    display: none;
-  }
-  [data-role='roost.folderName'] {
-    flex-shrink: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  [data-role='roost.folderToggle'] { gap: 4px; padding-right: 2px; }
-  [data-role='roost.worktree'] { margin-left: 6px; }
-  [data-role='roost.session'],
-  [data-role='roost.settledRow'] { margin-left: 4px; padding: 0 2px; }
-  [data-role='roost.row'],
-  [data-role='roost.settledHead'] { padding: 3px 4px; }
-  [data-role='roost.head'],
-  [data-role='roost.settledHead'] { gap: 5px; }
-  [data-role='roost.sub'] { padding-left: 13px; }
-  [data-role='roost.hint'] { padding-left: 8px; }
-  [data-role='roost.age'] { min-width: 0; }
 }

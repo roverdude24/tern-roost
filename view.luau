@@ -69,7 +69,6 @@ local function sessionNode(session)
 	local tip = tooltip(session)
 	local head = {
 		ui.el("div", { key = "status", role = role, title = dotTitle }),
-		badge("badge", session.badge, session.role),
 		text("name", session.name, "roost.name"),
 		ui.el("div", { key = "spacer", grow = 1 }),
 	}
@@ -209,7 +208,7 @@ local function settledNode(row)
 			text("name", row.name, "roost.settledName"),
 			ui.el("div", { key = "spacer", grow = 1 }),
 			text("age", row.age, "roost.age"),
-			iconButton("restore", "undo", "restore=" .. row.sid, "Restore " .. row.name, "roost.iconButton"),
+			iconButton("restore", "undo", "restore=" .. row.sid, "Restore " .. row.name, "roost.restore"),
 		}),
 	})
 end
