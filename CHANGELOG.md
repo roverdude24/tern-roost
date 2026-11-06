@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Narrow panel (300 px or less): folder names shorten with an ellipsis instead of spilling off the left edge, and the folder's hover buttons, parent path, session badges and harness mark drop out. Indents shrink too. Those actions stay in the right-click menu and the tooltips.
+- Narrow panels: folder names end in `…` instead of spilling off the left edge, and the folder path, then the harness icon give way to session names. Folder buttons and Settled's `↶` take no room until hovered (the right-click menu still has them). Session rows drop the folder badge their folder header already shows.
 
 ## 0.2.5
 
