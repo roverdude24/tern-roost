@@ -267,3 +267,34 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Narrow panel: drop what the tooltip and right-click menu already carry, so names get the room. */
+[data-role='roost.panel'],
+[data-role='roost.settled'] {
+  container-type: inline-size;
+}
+@container (max-width: 300px) {
+  [data-role='roost.hoverAct'],
+  [data-role='roost.harness'],
+  [data-role='roost.folderParent'],
+  [data-role='roost.head'] [data-role^='roost.badge'],
+  [data-role='roost.settledHead'] [data-role^='roost.badge'] {
+    display: none;
+  }
+  [data-role='roost.folderName'] {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  [data-role='roost.folderToggle'] { gap: 4px; padding-right: 2px; }
+  [data-role='roost.worktree'] { margin-left: 6px; }
+  [data-role='roost.session'],
+  [data-role='roost.settledRow'] { margin-left: 4px; padding: 0 2px; }
+  [data-role='roost.row'],
+  [data-role='roost.settledHead'] { padding: 3px 4px; }
+  [data-role='roost.head'],
+  [data-role='roost.settledHead'] { gap: 5px; }
+  [data-role='roost.sub'] { padding-left: 13px; }
+  [data-role='roost.hint'] { padding-left: 8px; }
+  [data-role='roost.age'] { min-width: 0; }
+}
