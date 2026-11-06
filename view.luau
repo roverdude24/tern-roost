@@ -97,36 +97,36 @@ local function sessionNode(session)
 	}, { row })
 end
 
--- A worktree's header already names its branch, so its line carries only the rest.
-local function gitLine(git, hideBranch)
-	local parts = {}
-	if not hideBranch then
-		table.insert(parts, ui.button("", {
-			key = "icon", icon = "branch", size = "sm", variant = "quiet", role = "roost.gitIcon",
-			title = "Branch " .. git.branch, aria = "Branch " .. git.branch,
-		}))
-		table.insert(parts, text("branch", git.branch, "roost.gitBranch"))
+-- Git sits in the folder header as small marks; the header's tooltip spells it out.
+-- The branch only shows when it is not the usual main/master, and a worktree's name already is it.
+local function gitMarks(git, hideBranch)
+	local parts, facts = {}, {}
+	local branch = git.branch or "detached HEAD"
+	table.insert(facts, if git.branch then "Branch " .. branch else branch)
+	if not hideBranch and branch ~= "main" and branch ~= "master" then
+		table.insert(parts, text("branch", branch, "roost.gitBranch", { title = "Branch " .. branch }))
 	end
 	if git.dirty then
-		table.insert(parts, text("dirty", "✱", "roost.dirty", { title = "Uncommitted changes" }))
+		table.insert(facts, "uncommitted changes")
+		table.insert(parts, text("dirty", "●", "roost.dirty", { title = "Uncommitted changes" }))
 	end
 	if git.ahead > 0 or git.behind > 0 then
 		local label = (if git.ahead > 0 then "↑" .. tostring(git.ahead) else "")
-			.. (if git.ahead > 0 and git.behind > 0 then " " else "")
 			.. (if git.behind > 0 then "↓" .. tostring(git.behind) else "")
-		table.insert(parts, text("div", label, "roost.gitDiv",
-			{ title = tostring(git.ahead) .. " ahead, " .. tostring(git.behind) .. " behind" }))
+		local said = tostring(git.ahead) .. " ahead, " .. tostring(git.behind) .. " behind"
+		table.insert(facts, said)
+		table.insert(parts, text("div", label, "roost.gitDiv", { title = said }))
 	end
 	if git.pr then
 		local summary = "#" .. tostring(git.pr.number) .. " · " .. git.pr.state
+		table.insert(facts, "pull request " .. summary)
 		table.insert(parts, ui.button("#" .. tostring(git.pr.number), {
 			key = "pr", size = "sm", variant = "quiet", role = "roost.pr",
 			title = "Pull request " .. summary .. " — open on GitHub", aria = "Pull request " .. summary,
 			actions = { click = "pr=" .. Folders.hex(git.pr.url) },
 		}))
 	end
-	if #parts == 0 then return nil end
-	return ui.node("row", { key = "git", role = "roost.gitLine" }, parts)
+	return parts, table.concat(facts, " · ")
 end
 
 local folderNode
@@ -148,6 +148,12 @@ function folderNode(group)
 		}, toggleChildren),
 		ui.el("div", { key = "spacer", grow = 1 }),
 	}
+	local tip = group.path
+	if group.git then
+		local marks, facts = gitMarks(group.git, group.worktree)
+		for _, mark in marks do table.insert(header, mark) end
+		tip ..= "\n" .. facts
+	end
 	local menu
 	if not group.other then
 		if group.pinned then
@@ -171,11 +177,9 @@ function folderNode(group)
 	local children = {
 		ui.node("row", {
 			key = "header", role = "roost.folderHeader", actions = if menu then { menu = menu } else nil,
-			title = group.path,
+			title = tip,
 		}, header),
 	}
-	local line = group.git and gitLine(group.git, group.worktree)
-	if line then table.insert(children, line) end
 	if not group.collapsed then
 		for _, session in ipairs(group.sessions) do
 			table.insert(children, sessionNode(session))

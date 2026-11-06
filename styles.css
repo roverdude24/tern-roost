@@ -184,8 +184,7 @@
 [data-role='roost.iconButton'],
 [data-role='roost.hoverAct'],
 [data-role='roost.restore'],
-[data-role='roost.pinOn'],
-[data-role='roost.gitIcon'] {
+[data-role='roost.pinOn'] {
   flex-shrink: 0;
   color: var(--t3);
 }
@@ -206,9 +205,6 @@
 [data-role='roost.pinOn'] {
   color: var(--accent);
 }
-[data-role='roost.gitIcon'] {
-  pointer-events: none;
-}
 /* Row actions take no room until hovered or focused; the right-click menu has them too. */
 [data-role='roost.hoverAct'],
 [data-role='roost.restore'] {
@@ -220,16 +216,13 @@
 [data-role='roost.settledHead']:focus-within [data-role='roost.restore'] {
   display: flex;
 }
-/* Branch, dirty mark, ahead/behind and pull request under a folder's name. */
-[data-role='roost.gitLine'] {
-  align-items: center;
-  gap: 6px;
-  padding-left: 18px;
-  color: var(--t3);
-  font-size: 0.85em;
-}
+/* Git marks in the folder header: non-default branch, dirty dot, ahead/behind, pull request. */
 [data-role='roost.gitBranch'] {
+  flex: 0 1000 auto;
   min-width: 0;
+  max-width: 12ch;
+  color: var(--t3);
+  font-size: 0.8em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -237,10 +230,12 @@
 [data-role='roost.dirty'] {
   flex-shrink: 0;
   color: var(--warn);
-  font-weight: 700;
+  font-size: 0.6em;
 }
 [data-role='roost.gitDiv'] {
   flex-shrink: 0;
+  color: var(--t3);
+  font-size: 0.8em;
   white-space: nowrap;
 }
 [data-role='roost.pr'] {
