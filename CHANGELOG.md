@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.7
+
 - Fix: sessions stopped regrouping and auto-naming after Tern paused Roost's timer once for running over its 50 ms budget. The next tick is now scheduled before the work, so a pause no longer stops the loop.
 
 ## 0.2.6
