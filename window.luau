@@ -1194,9 +1194,11 @@ tern.chrome.status(function()
 end)
 
 -- Every 750 ms: keep the panel in the shown tab, refresh stale repository state
--- and draw what changed (renames and new sessions raise no event). Errors are
--- reported, not raised, so the timer always restarts.
+-- and draw what changed (renames and new sessions raise no event). The next tick
+-- is armed first: a hook killed for running over Tern's 50 ms budget never
+-- reaches its last line, and the loop (auto-naming, regrouping) would stop for good.
 local function tick(cx)
+	tern.timer(750, tick)
 	local ok, err = pcall(function()
 		if not localHost(cx) then return end
 		follow(cx)
@@ -1213,7 +1215,6 @@ local function tick(cx)
 		local text = tostring(err)
 		if problem ~= text then report(cx, text) end
 	end
-	tern.timer(750, tick)
 end
 
 tern.on("window_start", function(cx)
