@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.8
+
 - Fix: Tern's "timer exceeded 50 ms" toast. Each pass read every tab, pane and agent once per session, and built the whole model twice (tick and draw). Now one read serves all sessions, and only the draw builds the model: tick ~30 ms → ~3 ms, draw ~13 ms → ~8 ms.
 
 ## 0.2.7
