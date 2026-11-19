@@ -98,18 +98,21 @@ function Harness.prettyModel(id)
 	return table.concat(words, " ")
 end
 
--- Pane facts by id for the session: panes whose tab belongs to it.
-local function sessionPanes(cx, sessionId)
-	local id = tostring(sessionId)
-	local tabs = {}
-	for _, tab in cx.session:tabs() do
-		if tostring(tab.session) == id then tabs[tab.id] = true end
+-- One read of Tern's tabs, panes and agents, shared by every session's detection
+-- in a pass: reading them per session is what ran timers over Tern's 50 ms budget.
+function Harness.snapshot(cx)
+	local tabs, panes, agents = cx.session:tabs(), cx.session:panes(), cx.agents:list()
+	local tabSession = {}
+	for _, tab in tabs do tabSession[tab.id] = tostring(tab.session) end
+	local bySession = {}
+	for _, pane in panes do
+		local sid = pane.tab and tabSession[pane.tab]
+		if sid then
+			bySession[sid] = bySession[sid] or {}
+			bySession[sid][pane.pane] = pane
+		end
 	end
-	local panes = {}
-	for _, pane in cx.session:panes() do
-		if pane.tab and tabs[pane.tab] then panes[pane.pane] = pane end
-	end
-	return panes
+	return { tabs = tabs, panes = panes, agents = agents, bySession = bySession }
 end
 
 local function describe(kind, state, model, pane, title)
@@ -136,16 +139,17 @@ end
 -- The most relevant agent in a session: working beats waiting beats idle; native agent
 -- blocks (which know their model) beat agent CLIs found in plain terminals.
 -- -> { kind, label, model?, icon, state, pane? }; a session without an agent is kind "shell".
-function Harness.detect(cx, sessionId)
+function Harness.detect(cx, sessionId, snap)
 	local ok, result = pcall(function()
-		local panes = sessionPanes(cx, sessionId)
+		snap = snap or Harness.snapshot(cx)
+		local panes = snap.bySession[tostring(sessionId)] or {}
 		local best, bestScore
 		local function consider(found, state, native)
 			local score = RANK[state] * 2 + (if native then 1 else 0)
 			if not bestScore or score > bestScore then best, bestScore = found, score end
 		end
 		local seen = {}
-		for _, agent in cx.agents:list() do
+		for _, agent in snap.agents do
 			local pane = panes[agent.pane]
 			if pane and agent.state ~= "exited" then
 				seen[agent.pane] = true

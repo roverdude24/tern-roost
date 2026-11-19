@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: Tern's "timer exceeded 50 ms" toast. Each pass read every tab, pane and agent once per session, and built the whole model twice (tick and draw). Now one read serves all sessions, and only the draw builds the model: tick ~30 ms → ~3 ms, draw ~13 ms → ~8 ms.
+
 ## 0.2.7
 
 - Fix: sessions stopped regrouping and auto-naming after Tern paused Roost's timer once for running over its 50 ms budget. The next tick is now scheduled before the work, so a pause no longer stops the loop.

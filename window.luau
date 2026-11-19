@@ -215,16 +215,17 @@ end
 
 -- Each session's folder, by session id (as a string): its first tab's
 -- directory, falling through to the next tab when the first has none known.
-local function sessionCwds(cx)
+local function sessionCwds(cx, snap)
+	snap = snap or Harness.snapshot(cx)
 	local panesByTab = {}
-	for _, pane in cx.session:panes() do
+	for _, pane in snap.panes do
 		if pane.tab then
 			panesByTab[pane.tab] = panesByTab[pane.tab] or {}
 			table.insert(panesByTab[pane.tab], pane)
 		end
 	end
 	local tabsBySession = {}
-	for _, tab in cx.session:tabs() do
+	for _, tab in snap.tabs do
 		local key = tostring(tab.session)
 		tabsBySession[key] = tabsBySession[key] or {}
 		table.insert(tabsBySession[key], tab)
@@ -254,7 +255,8 @@ local function model(cx)
 	local home = tern.getenv("HOME")
 	local now = os.time()
 	local current = cx.sessions:current()
-	local cwds = sessionCwds(cx)
+	local snap = Harness.snapshot(cx)
+	local cwds = sessionCwds(cx, snap)
 	local collapsed = records("collapsed")
 	local pinned = {}
 	for _, path in records("pinned") do
@@ -297,7 +299,7 @@ local function model(cx)
 			local cwd = cwds[key]
 			local entry = group(if cwd then Folders.owner(cwd, owners) else Folders.OTHER)
 			local sub = if cwd and cwd ~= entry.path then Folders.relative(cwd, entry.path) else nil
-			local ok, detected = pcall(Harness.detect, cx, session.id)
+			local ok, detected = pcall(Harness.detect, cx, session.id, snap)
 			local harness = if ok and detected then detected else { kind = "shell", label = "shell", icon = "terminal", state = "idle" }
 			local agent = if harness.state == "working" or harness.state == "waiting" then harness.state else nil
 			if agent == "working" then touchSession(session.id) end
@@ -475,6 +477,9 @@ local function viewData(cx)
 	return data, live
 end
 
+-- The folders on show and the live session ids at the last draw, for the tick.
+local drawnPaths, drawnLive
+
 local function draw(cx)
 	local pane = slot(cx)
 	if not pane then return end
@@ -484,7 +489,8 @@ local function draw(cx)
 		if canvas.pane == pane then ready = true end
 	end
 	if not ready then return end
-	local data = viewData(cx)
+	local data, live = viewData(cx)
+	drawnPaths, drawnLive = shownPaths(data), live
 	local signature = tern.json.encode(data)
 	if rendered[pane] == signature then return end
 	cx.canvas:set(pane, { view = view.render(data), dock = view.dock(data) })
@@ -788,7 +794,8 @@ end
 -- the user renamed it (then Roost leaves it alone).
 local function autoName(cx)
 	local titled = records("titled")
-	local cwds = sessionCwds(cx)
+	local snap = Harness.snapshot(cx)
+	local cwds = sessionCwds(cx, snap)
 	local current = cx.sessions:current()
 	local changed, live = false, {}
 	for _, session in cx.sessions:list() do
@@ -798,7 +805,7 @@ local function autoName(cx)
 		if mine and mine ~= session.name then mine = false; titled[key] = false; changed = true end
 		local cwd = cwds[key]
 		if session.host == current.host and mine ~= false and (mine or (cwd and session.name == Folders.basename(cwd))) then
-			local title = Harness.detect(cx, session.id).title
+			local title = Harness.detect(cx, session.id, snap).title
 			if title and title ~= session.name then
 				local ok, err = pcall(function() cx.sessions:rename(session.id, title) end)
 				if ok then titled[key] = title; changed = true
@@ -1197,6 +1204,8 @@ end)
 -- and draw what changed (renames and new sessions raise no event). The next tick
 -- is armed first: a hook killed for running over Tern's 50 ms budget never
 -- reaches its last line, and the loop (auto-naming, regrouping) would stop for good.
+-- The model is built once per turn, by the draw this tick queues (its own timer,
+-- its own 50 ms); the tick reads that draw's folders and live sessions.
 local function tick(cx)
 	tern.timer(750, tick)
 	local ok, err = pcall(function()
@@ -1205,9 +1214,8 @@ local function tick(cx)
 		seedActivity(cx)
 		autoName(cx)
 		if slot(cx) then
-			local data, live = viewData(cx)
-			refreshGit(cx, shownPaths(data))
-			saveActivity(cx, live)
+			if drawnPaths then refreshGit(cx, drawnPaths) end
+			if drawnLive then saveActivity(cx, drawnLive) end
 			redraw(cx)
 		end
 	end)
