@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0
+
 - Sessions from every connected host (`tern remote`) show in the panel, not only this Mac's. With more than one host, each row names its host; click a remote row to switch to it. Remote folders (Windows paths included) group like local ones and offer only *Move*. The panel, shortcut and Find session now work while you view a remote host instead of saying "Local host required".
 
 ## 0.2.9
