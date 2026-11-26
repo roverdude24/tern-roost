@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.3.1
+
+- Remote folders are keyed by host (`vinhlam-pc:C:\…`), so the same path on two machines no longer merges into one folder.
+- Auto-naming covers sessions on every host. A host that refuses a rename is left alone instead of retried every tick.
+- *Restore* of a settled remote session switches to its host and reopens it there (same folder, name and harness).
+
 ## 0.3.0
 
 - Sessions from every connected host (`tern remote`) show in the panel, not only this Mac's. With more than one host, each row names its host; click a remote row to switch to it. Remote folders (Windows paths included) group like local ones and offer only *Move*. The panel, shortcut and Find session now work while you view a remote host instead of saying "Local host required".

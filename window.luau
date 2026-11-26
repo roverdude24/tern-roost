@@ -312,22 +312,24 @@ local function model(cx)
 		live[key] = true
 		local remote = session.host ~= localId
 		local cwd = cwds[key]
-		-- shortcut: folders group by path alone, so the same path on two Macs shares a folder; key by host if that bites.
-		local entry = group(if cwd then Folders.owner(cwd, owners) else Folders.OTHER)
-		if not remote then entry.remote = false elseif entry.remote == nil then entry.remote = true end
-		local sub = if cwd and cwd ~= entry.path then Folders.relative(cwd, entry.path) else nil
-		local ok, detected = pcall(Harness.detect, cx, session.id, snap)
-		local harness = if ok and detected then detected else { kind = "shell", label = "shell", icon = "terminal", state = "idle" }
-		local agent = if harness.state == "working" or harness.state == "waiting" then harness.state else nil
-		if agent == "working" then touchSession(session.id) end
-		if lastActive[key] == nil and seedDone then lastActive[key] = now; activityDirty = true end
-		local at = lastActive[key] or now
 		local hostName = hostNames[session.host]
 		if not hostName then
 			hostName = Harness.host(cx, session.host) or "local"
 			hostNames[session.host] = hostName
 			hostCount += 1
 		end
+		-- A remote folder is keyed "host:path", so the same path on two machines stays two folders;
+		-- pins and repositories are this Mac's, so remote sessions group by their own directory.
+		local folder = if not cwd then Folders.OTHER elseif remote then hostName .. ":" .. cwd else Folders.owner(cwd, owners)
+		local entry = group(folder)
+		if not remote then entry.remote = false elseif entry.remote == nil then entry.remote = true end
+		local sub = if cwd and not remote and cwd ~= entry.path then Folders.relative(cwd, entry.path) else nil
+		local ok, detected = pcall(Harness.detect, cx, session.id, snap)
+		local harness = if ok and detected then detected else { kind = "shell", label = "shell", icon = "terminal", state = "idle" }
+		local agent = if harness.state == "working" or harness.state == "waiting" then harness.state else nil
+		if agent == "working" then touchSession(session.id) end
+		if lastActive[key] == nil and seedDone then lastActive[key] = now; activityDirty = true end
+		local at = lastActive[key] or now
 		local where = if cwd then Folders.short(cwd, home) else Folders.OTHER
 		local isMoving = moving and moving.session == session.id
 		if isMoving then movingLabel = session.name end
@@ -796,9 +798,10 @@ end
 
 -- A new session named after the folder (or `name`), its first tab there. With
 -- `command` the first tab runs it instead of a shell. Returns whether it started.
-local function newSessionIn(cx, path, command, name)
-	if not requireLocal(cx) then return false end
-	if not tern.fs.exists(path) then
+-- `remote`: `path` lives on the shown remote host, so skip this Mac's checks.
+local function newSessionIn(cx, path, command, name, remote)
+	if not remote and not requireLocal(cx) then return false end
+	if not remote and not tern.fs.exists(path) then
 		report(cx, "Folder is missing: " .. path, "Folder unavailable")
 		redraw(cx)
 		return false
@@ -859,7 +862,6 @@ local function autoName(cx)
 	local titled = records("titled")
 	local snap = Harness.snapshot(cx)
 	local cwds = sessionCwds(cx, snap)
-	local localId = localHostId(cx)
 	local changed, live = false, {}
 	for _, session in cx.sessions:list() do
 		local key = tostring(session.id)
@@ -867,12 +869,13 @@ local function autoName(cx)
 		local mine = titled[key]
 		if mine and mine ~= session.name then mine = false; titled[key] = false; changed = true end
 		local cwd = cwds[key]
-		if session.host == localId and mine ~= false and (mine or (cwd and session.name == Folders.basename(cwd))) then
+		if mine ~= false and (mine or (cwd and session.name == Folders.basename(cwd))) then
 			local title = Harness.detect(cx, session.id, snap).title
 			if title and title ~= session.name then
 				local ok, err = pcall(function() cx.sessions:rename(session.id, title) end)
 				if ok then titled[key] = title; changed = true
-				else tern.log.warn("Roost auto-name failed: " .. tostring(err)) end
+				-- A host that refuses renames would fail every tick: give the session up instead.
+				else titled[key] = false; changed = true; tern.log.warn("Roost auto-name failed: " .. tostring(err)) end
 			end
 		end
 	end
@@ -978,8 +981,28 @@ local function restoreSettled(cx, sid)
 	local record = findSettled(sid)
 	if not record then redraw(cx); return end
 	if not record.cwd then report(cx, "This session had no known folder.", "Cannot restore"); return end
-	if record.remote then report(cx, "Restore it on " .. (record.host or "its host") .. ".", "Remote session"); return end
 	local command = Harness.launchCommand(record.kind)
+	if record.remote then
+		-- Sessions are created on the shown host: go to the record's host first, then create once it is shown.
+		local want = string.lower(record.host or "")
+		local switched = pcall(function() cx.hosts:switch(record.host) end)
+		if not switched then report(cx, "Connect " .. tostring(record.host) .. " first.", "Cannot restore"); return end
+		local tries = 0
+		local function attempt(nextCx)
+			if not nextCx then return end
+			if string.lower(nextCx.hosts:current().name) ~= want then
+				tries += 1
+				if tries < 10 then tern.timer(200, attempt) else report(nextCx, "Could not reach " .. record.host .. ".", "Cannot restore") end
+				return
+			end
+			if newSessionIn(nextCx, record.cwd, command, record.name, true) then
+				forgetSettled(nextCx, sid)
+				nextCx:toast("info", "Session restored", notificationLabel(record.name))
+			end
+		end
+		tern.timer(0, attempt)
+		return
+	end
 	if newSessionIn(cx, record.cwd, command, record.name) then
 		forgetSettled(cx, sid)
 		cx:toast("info", "Session restored", notificationLabel(record.name))
