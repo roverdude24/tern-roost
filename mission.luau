@@ -196,7 +196,9 @@ local function currentFilter()
 end
 
 -- One chip per project, the busiest first, so many projects stay one click away.
-local function projectBar(projects, filter, total)
+local function projectBar(projects, filter)
+	local total = 0
+	for _, project in projects do total += project.open end
 	local chips = { button("fall", "All · " .. total, "mission-filter=*", "Every project", if filter == nil then "default" else nil) }
 	for _, project in projects do
 		local label = project.name .. " · " .. project.open .. (if project.you > 0 then " · " .. project.you .. " need you" else "")
@@ -207,12 +209,10 @@ local function projectBar(projects, filter, total)
 end
 
 function Mission.render()
-	local count = if data.tasks then #data.tasks else 0
 	local children = {
 		ui.node("row", { key = "header", role = "roost.header" }, {
 			ui.node("row", { key = "titleGroup", role = "roost.titleGroup", grow = 1 }, {
 				text("title", Mission.TITLE, "roost.heading"),
-				text("total", tostring(count), "roost.count", { title = "Open tasks" }),
 				text("updated", if data.updated then "Updated " .. data.updated else "", "roost.sub", { title = "Refreshes every 30 s" }),
 			}),
 			button("goal", "New goal", "mission-goal", "Post a goal to a project; the lead plans it"),
@@ -233,7 +233,7 @@ function Mission.render()
 	if data.tasks then
 		local filter = currentFilter()
 		local model = Mission.model(data.tasks, data.recent, data.names, filter)
-		table.insert(children, projectBar(model.projects, filter, count))
+		table.insert(children, projectBar(model.projects, filter))
 		local columns = {}
 		for _, column in COLUMNS do table.insert(columns, columnNode(column, model.columns[column.id], filter == nil)) end
 		table.insert(children, ui.node("row", { key = "kanban", role = "roost.kanban" }, columns))
