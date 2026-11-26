@@ -347,15 +347,17 @@
   border-left-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-/* Board and the selected task's sub-panel side by side; the panel drops below when the tab is narrow. */
+/* Board and the selected task's sub-panel side by side; the board's columns wrap to make room. */
 [data-role='roost.missionBoard'] {
   align-items: flex-start;
   gap: 10px;
-  flex-wrap: wrap;
+}
+[data-role='roost.missionBoard'] > [data-role='roost.kanban'] {
+  flex: 1 1 0;
+  min-width: 0;
 }
 [data-role='roost.missionDetail'] {
-  flex: 0 1 440px;
-  min-width: 300px;
+  flex: 0 0 420px;
   gap: 8px;
   padding: 10px;
   border-radius: 8px;
