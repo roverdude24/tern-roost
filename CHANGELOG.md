@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Sessions from every connected host (`tern remote`) show in the panel, not only this Mac's. With more than one host, each row names its host; click a remote row to switch to it. Remote folders (Windows paths included) group like local ones and offer only *Move*.
+
 ## 0.2.9
 
 - Reorder folders and sessions: right-click › Move picks one up (dashed outline, a hint at the top), then click the folder or session whose place it should take. Tern panels deliver clicks, not drags, so this stands in for drag and drop. Sessions move within their own folder; worktrees keep name order. New folders and sessions show above the ones you placed.

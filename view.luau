@@ -83,6 +83,9 @@ local function sessionNode(session)
 	if session.sub then
 		table.insert(rowChildren, text("sub", session.sub, "roost.sub"))
 	end
+	if session.place then
+		table.insert(rowChildren, text("host", session.place, "roost.sub", { title = "Host: " .. session.place }))
+	end
 	local row = ui.node("col", {
 		key = "row", role = "roost.row", title = tip,
 		aria = session.name .. ", " .. plural(session.tabs, "tab") .. ", " .. session.harness.label
@@ -155,7 +158,10 @@ function folderNode(group)
 		tip ..= "\n" .. facts
 	end
 	local menu
-	if not group.other then
+	-- A folder on another machine: new sessions, Finder and pins only work on this Mac.
+	if group.remote and not group.other then
+		menu = { "Move" }
+	elseif not group.other then
 		if group.pinned then
 			table.insert(header, iconButton("pin", "pin", "pin=" .. hex, "Unpin folder (it hides when it has no sessions)", "roost.pinOn"))
 		end

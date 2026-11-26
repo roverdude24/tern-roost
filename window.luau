@@ -257,7 +257,6 @@ end
 local function model(cx)
 	local home = tern.getenv("HOME")
 	local now = os.time()
-	local current = cx.sessions:current()
 	local snap = Harness.snapshot(cx)
 	local cwds = sessionCwds(cx, snap)
 	local collapsed = records("collapsed")
@@ -301,36 +300,52 @@ local function model(cx)
 	for _, path in pinned do group(path) end
 	local total = 0
 	local live = {}
+	-- Every attached host's sessions; a remote one carries its host name, shown on the row once two hosts appear.
+	local localId, hostNames, hostCount, rows = nil, {}, 0, {}
+	for _, host in cx.hosts:list() do
+		if host.kind == "local" then localId = host.id end
+	end
 	for _, session in cx.sessions:list() do
-		if session.host == current.host then
-			total += 1
-			local key = tostring(session.id)
-			live[key] = true
-			local cwd = cwds[key]
-			local entry = group(if cwd then Folders.owner(cwd, owners) else Folders.OTHER)
-			local sub = if cwd and cwd ~= entry.path then Folders.relative(cwd, entry.path) else nil
-			local ok, detected = pcall(Harness.detect, cx, session.id, snap)
-			local harness = if ok and detected then detected else { kind = "shell", label = "shell", icon = "terminal", state = "idle" }
-			local agent = if harness.state == "working" or harness.state == "waiting" then harness.state else nil
-			if agent == "working" then touchSession(session.id) end
-			if lastActive[key] == nil and seedDone then lastActive[key] = now; activityDirty = true end
-			local at = lastActive[key] or now
-			local hostName = Harness.host(cx, session.host) or "local"
-			local where = if cwd then Folders.short(cwd, home) else Folders.OTHER
-			local isMoving = moving and moving.session == session.id
-			if isMoving then movingLabel = session.name end
-			table.insert(entry.sessions, {
-				id = session.id, name = session.name, tabs = session.tabs, locked = session.locked,
-				current = session.current, agent = agent, sub = sub, where = where, host = hostName,
-				harness = { kind = harness.kind, label = harness.label, icon = harness.icon, model = harness.model },
-				at = at, age = Folders.age(math.max(0, now - at)), moving = if isMoving then true else nil,
-			})
-			if at > entry.newest then entry.newest = at end
-			known[key] = {
-				name = session.name, cwd = cwd, folder = entry.path, kind = harness.kind, label = harness.label,
-				model = harness.model, host = hostName, at = at,
-			}
+		total += 1
+		local key = tostring(session.id)
+		live[key] = true
+		local remote = session.host ~= localId
+		local cwd = cwds[key]
+		-- shortcut: folders group by path alone, so the same path on two Macs shares a folder; key by host if that bites.
+		local entry = group(if cwd then Folders.owner(cwd, owners) else Folders.OTHER)
+		if not remote then entry.remote = false elseif entry.remote == nil then entry.remote = true end
+		local sub = if cwd and cwd ~= entry.path then Folders.relative(cwd, entry.path) else nil
+		local ok, detected = pcall(Harness.detect, cx, session.id, snap)
+		local harness = if ok and detected then detected else { kind = "shell", label = "shell", icon = "terminal", state = "idle" }
+		local agent = if harness.state == "working" or harness.state == "waiting" then harness.state else nil
+		if agent == "working" then touchSession(session.id) end
+		if lastActive[key] == nil and seedDone then lastActive[key] = now; activityDirty = true end
+		local at = lastActive[key] or now
+		local hostName = hostNames[session.host]
+		if not hostName then
+			hostName = Harness.host(cx, session.host) or "local"
+			hostNames[session.host] = hostName
+			hostCount += 1
 		end
+		local where = if cwd then Folders.short(cwd, home) else Folders.OTHER
+		local isMoving = moving and moving.session == session.id
+		if isMoving then movingLabel = session.name end
+		local row = {
+			id = session.id, name = session.name, tabs = session.tabs, locked = session.locked,
+			current = session.current, agent = agent, sub = sub, where = where, host = hostName,
+			harness = { kind = harness.kind, label = harness.label, icon = harness.icon, model = harness.model },
+			at = at, age = Folders.age(math.max(0, now - at)), moving = if isMoving then true else nil,
+		}
+		table.insert(entry.sessions, row)
+		table.insert(rows, row)
+		if at > entry.newest then entry.newest = at end
+		known[key] = {
+			name = session.name, cwd = cwd, folder = entry.path, kind = harness.kind, label = harness.label,
+			model = harness.model, host = hostName, at = at, remote = if remote then true else nil,
+		}
+	end
+	if hostCount > 1 then
+		for _, row in rows do row.place = row.host end
 	end
 	for _, entry in groups do
 		table.sort(entry.sessions, function(a, b)
@@ -951,6 +966,7 @@ local function restoreSettled(cx, sid)
 	local record = findSettled(sid)
 	if not record then redraw(cx); return end
 	if not record.cwd then report(cx, "This session had no known folder.", "Cannot restore"); return end
+	if record.remote then report(cx, "Restore it on " .. (record.host or "its host") .. ".", "Remote session"); return end
 	local command = Harness.launchCommand(record.kind)
 	if newSessionIn(cx, record.cwd, command, record.name) then
 		forgetSettled(cx, sid)

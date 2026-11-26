@@ -27,8 +27,9 @@ function Folders.norm(path)
 	return canon(trimmed)
 end
 
+-- Remote Windows hosts report paths with backslashes, so both separators count here.
 function Folders.basename(path)
-	return string.match(path, "([^/]+)/*$") or path
+	return string.match(path, "([^/\\]+)[/\\]*$") or path
 end
 
 -- "~" for the home folder and paths inside it.
@@ -99,7 +100,7 @@ end
 -- be cut to fit) and its name, which always stays whole: "~/exo" → "~/", "exo".
 function Folders.parts(path, home)
 	local short = Folders.short(path, home)
-	local prefix, name = string.match(short, "^(.*/)([^/]+)$")
+	local prefix, name = string.match(short, "^(.*[/\\])([^/\\]+)$")
 	if not prefix then return "", short end
 	return prefix, name
 end
@@ -109,6 +110,7 @@ assert(Folders.norm("/private/tmp/x/") == "/tmp/x" and Folders.norm("/private/tm
 assert(Folders.basename("/Volumes/VINH MAC/it's here/") == "it's here")
 assert(Folders.short("/Users/v/exo", "/Users/v") == "~/exo" and Folders.short("/Users/v", "/Users/v") == "~")
 assert(Folders.short("/Users/vv", "/Users/v") == "/Users/vv")
+assert(Folders.basename("C:\\Users\\lamvi\\tmp") == "tmp" and select(2, Folders.parts("C:\\Users\\lamvi\\tmp", nil)) == "tmp")
 assert(Folders.within("/p/a", "/p") and not Folders.within("/pa", "/p") and Folders.within("/x", "/"))
 assert(Folders.owner("/p/a/b", { "/p/a", "/p", "/q" }) == "/p/a" and Folders.owner("/x", { "/p" }) == "/x")
 assert(Folders.owner("/p", { "/", "/p" }) == "/p")

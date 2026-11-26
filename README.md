@@ -28,6 +28,8 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 **Order.** Right-click › *Move* on a folder or session picks it up; then click the folder or session whose place it should take (click it again to cancel). Tern panels take clicks, not drags, so this is Roost's drag and drop. Sessions move only within their folder. Your order sticks; new folders and sessions appear above it.
 
+**Hosts.** Sessions on every machine Tern is connected to (`tern remote`) are listed, grouped by folder like local ones. Once two hosts appear, each row names its host under the session name; click a remote row to switch to it. Folders that exist only on another machine offer just *Move*: new sessions, Finder, pins and git marks work on this Mac. The panel itself shows while you view this Mac; *Restore* of a remote settled session is left to that host.
+
 **Names.** A session still named after its folder (the name Tern and Roost give a new one) takes the title its agent sets, minus the leading icon, so omp's `OMNI: Evaluate openomni and omniget repos` becomes the session's name, in the panel and in Tern's tab bar alike. It follows the title as the agent retitles. Rename a session yourself (in Roost or Tern) and Roost leaves that name alone.
 
 **Activity.** Tern gives no timestamps, so Roost stamps a session whenever a command starts or finishes, an agent changes state, a title or directory changes, or you focus it. Sessions that predate Roost start from how long `tern inspect` says they have been quiet. Stamps are saved in the plugin's store.
