@@ -1,6 +1,8 @@
 -- Mission control: a Tern tab over the VinhLam Board. The Board's lead splits each goal posted to
--- <project>/build into worker and reviewer tasks; this tab posts goals, shows open tasks and answers
--- what waits for you. Everything goes through the Board CLI (`vb`) in the Board folder.
+-- <project>/build into worker and reviewer tasks; this tab posts goals, shows tasks as a Kanban board
+-- (one project or all) and answers what waits for you. Everything goes through the Board CLI (`vb`)
+-- in the Board folder.
+local Badge = require("./badge")
 local ui = tern.ui
 local Mission = {}
 
@@ -9,7 +11,8 @@ local ABOUT = "Goals, tasks and decisions on the VinhLam Board. New goal posts t
 	.. "where the lead plans it; Answer replies in a decision's thread; Open shows a thread as a note."
 local REFRESH_MS = 30000
 
-local data = { tasks = nil, error = nil, loading = false, at = 0 }
+-- tasks: open tasks everywhere; recent: each project's latest build threads (for Done); names: projects.
+local data = { tasks = nil, recent = {}, names = nil, error = nil, loading = false, at = 0, updated = nil }
 local hooks = {} -- set by window.luau: report(cx, text, title), chooseFolder(cx, prompt, done)
 
 function Mission.setup(fns)
@@ -66,37 +69,71 @@ function Mission.options(text)
 	return found
 end
 
--- Open tasks as the tab shows them: what waits for you, then each project's goals and tasks.
-function Mission.model(tasks)
-	local now, byName, projects = {}, {}, {}
-	for _, item in tasks or {} do
-		local message = item.message or {}
-		local labels = message.labels or {}
-		local task = message.task or {}
-		local channel = message.channel or "?"
-		local name = string.match(channel, "^([^/]+)/") or channel
-		local blocked = if type(task.blocked) == "table" then task.blocked else nil
-		local decision = string.sub(channel, -10) == "/decisions" or labels.role == "decision"
-		local row = {
-			id = message.id, title = firstLine(message.text), state = task.state or "?",
-			role = labels.role, lane = labels.lane, replies = item.replies or 0, decision = decision,
-			last = item.last and string.gsub(firstLine(item.last.text), "^%[[^%]]*%]%s*", "") or nil,
-			reason = blocked and (blocked.reason or blocked.kind) or task.reason,
-			options = if decision then Mission.options(message.text) else {},
-		}
-		if row.state == "blocked" then table.insert(now, row) end
-		if not decision then
-			local project = byName[name]
-			if not project then
-				project = { name = name, goals = {}, tasks = {} }
-				byName[name] = project
-				table.insert(projects, project)
-			end
-			table.insert(if row.role == "epic" then project.goals else project.tasks, row)
+-- Kanban columns, left to right; a task's Board state picks its column, canceled ones show nowhere.
+local COLUMNS = {
+	{ id = "you", title = "Needs you", tone = "bad" },
+	{ id = "todo", title = "Todo", tone = "warn" },
+	{ id = "working", title = "Working", tone = "warn" },
+	{ id = "waiting", title = "Waiting", tone = "warn" },
+	{ id = "done", title = "Done", tone = "ok" },
+}
+local COLUMN_OF = { blocked = "you", failed = "you", ready = "todo", claimed = "working", waiting = "waiting", completed = "done" }
+local DONE_SHOWN = 12
+
+local function rowOf(item)
+	local message = item.message or {}
+	local labels = message.labels or {}
+	local task = message.task or {}
+	local channel = message.channel or "?"
+	local blocked = if type(task.blocked) == "table" then task.blocked else nil
+	local decision = string.sub(channel, -10) == "/decisions" or labels.role == "decision"
+	return {
+		id = message.id, title = firstLine(message.text), state = task.state or labels["board.task"] or "?",
+		project = string.match(channel, "^([^/]+)/") or channel, role = labels.role, lane = labels.lane,
+		decision = decision, at = (item.last and item.last.createdAt) or message.createdAt or "",
+		last = item.last and string.gsub(firstLine(item.last.text), "^%[[^%]]*%]%s*", "") or nil,
+		reason = blocked and (blocked.reason or blocked.kind) or task.reason,
+		options = if decision then Mission.options(message.text) else {},
+	}
+end
+
+-- Rows by column for `filter` (a project name, nil = all) and every project's counts, most urgent first.
+function Mission.model(tasks, recent, names, filter)
+	local seen, rows = {}, {}
+	local function add(item)
+		local row = rowOf(item)
+		if row.id and not seen[row.id] then
+			seen[row.id] = true
+			table.insert(rows, row)
 		end
 	end
-	table.sort(projects, function(a, b) return a.name < b.name end)
-	return { now = now, projects = projects }
+	for _, item in tasks or {} do add(item) end
+	for _, threads in recent or {} do for _, item in threads do add(item) end end
+	local columns, counts = {}, {}
+	for _, column in COLUMNS do columns[column.id] = {} end
+	for _, name in names or {} do counts[name] = { open = 0, you = 0 } end
+	for _, row in rows do
+		local column = if row.decision and row.state ~= "completed" and row.state ~= "canceled" then "you" else COLUMN_OF[row.state]
+		if column then
+			local count = counts[row.project]
+			if not count then
+				count = { open = 0, you = 0 }
+				counts[row.project] = count
+			end
+			if column ~= "done" then count.open += 1 end
+			if column == "you" then count.you += 1 end
+			if filter == nil or filter == row.project then table.insert(columns[column], row) end
+		end
+	end
+	table.sort(columns.done, function(a, b) return a.at > b.at end)
+	local projects = {}
+	for name, count in counts do table.insert(projects, { name = name, open = count.open, you = count.you }) end
+	table.sort(projects, function(a, b)
+		if a.you ~= b.you then return a.you > b.you end
+		if a.open ~= b.open then return a.open > b.open end
+		return a.name < b.name
+	end)
+	return { columns = columns, projects = projects }
 end
 
 local function text(key, value, role, props)
@@ -105,8 +142,8 @@ local function text(key, value, role, props)
 	return ui.node("text", props)
 end
 
-local function button(key, label, action, title)
-	return ui.button(label, { key = key, size = "sm", variant = "quiet", title = title or label, actions = { click = action } })
+local function button(key, label, action, title, variant)
+	return ui.button(label, { key = key, size = "sm", variant = variant or "quiet", title = title or label, actions = { click = action } })
 end
 
 -- Board task states as coloured pills, after pi-emphasis: red = wrong, yellow = look here, green = settled.
@@ -116,28 +153,57 @@ local STATES = {
 	ready = { "● Ready", "ok" }, completed = { "✓ Done", "ok" }, canceled = { "– Canceled", "dim" },
 }
 
-local function taskRow(row)
+local function card(row, showProject)
 	local state = STATES[row.state] or { row.state, "dim" }
 	local kind = (if row.role == "epic" then "goal" else row.role or "task") .. (if row.lane then " · " .. row.lane else "")
+	local pills = { text("state", state[1], "roost.missionPill", { mark = state[2], title = "Board state: " .. row.state }) }
+	if showProject then table.insert(pills, text("project", row.project, Badge.role(row.project), { title = "Project " .. row.project })) end
+	table.insert(pills, text("kind", kind, "roost.missionPill", { mark = if row.decision then "warn" else "kind" }))
 	local children = {
-		ui.node("row", { key = "head", role = "roost.missionHead" }, {
-			text("state", state[1], "roost.missionPill", { mark = state[2], title = "Board state: " .. row.state }),
-			text("kind", kind, "roost.missionPill", { mark = if row.decision then "warn" else "kind" }),
-			text("title", row.title, "roost.missionTitle", { grow = 1 }),
-			button("open", "Open", "mission-open=" .. row.id, "Show the whole thread as a note"),
+		ui.node("row", { key = "pills", role = "roost.missionHead" }, pills),
+		text("title", row.title, "roost.missionTitle"),
+	}
+	if row.reason and (row.state == "blocked" or row.state == "failed") then table.insert(children, text("reason", row.reason, "roost.hint")) end
+	if row.role == "epic" and row.last then table.insert(children, text("last", "Lead: " .. row.last, "roost.hint")) end
+	local actions = { button("open", "Open", "mission-open=" .. row.id, "Show the whole thread as a note") }
+	if row.state == "blocked" or (row.decision and row.state ~= "completed") then
+		for index, option in row.options do
+			table.insert(actions, button("o" .. index, option.key .. " — " .. option.label, "mission-answer=" .. row.id .. "|" .. option.key, "Reply " .. option.key))
+		end
+		table.insert(actions, button("answer", "Answer…", "mission-answer=" .. row.id, "Write a reply in this thread"))
+	end
+	table.insert(children, ui.node("row", { key = "actions", role = "roost.missionAnswers" }, actions))
+	return ui.node("col", { key = "t" .. string.gsub(row.id, "%W", ""), role = "roost.missionRow", mark = state[2] }, children)
+end
+
+local function columnNode(column, rows, showProject)
+	local children = {
+		ui.node("row", { key = "head", role = "roost.kanbanHead" }, {
+			text("title", column.title, "roost.kanbanTitle", { mark = column.tone, grow = 1 }),
+			text("count", tostring(#rows), "roost.count"),
 		}),
 	}
-	if row.reason and row.state == "blocked" then table.insert(children, text("reason", row.reason, "roost.hint")) end
-	if row.role == "epic" and row.last then table.insert(children, text("last", "Lead: " .. row.last, "roost.hint")) end
-	if row.state == "blocked" then
-		local answers = {}
-		for index, option in row.options do
-			table.insert(answers, button("o" .. index, option.key .. " — " .. option.label, "mission-answer=" .. row.id .. "|" .. option.key, "Reply " .. option.key))
-		end
-		table.insert(answers, button("answer", "Answer…", "mission-answer=" .. row.id, "Write a reply in this thread"))
-		table.insert(children, ui.node("row", { key = "answers", role = "roost.missionAnswers" }, answers))
+	local shown = if column.id == "done" then math.min(#rows, DONE_SHOWN) else #rows
+	for index = 1, shown do table.insert(children, card(rows[index], showProject)) end
+	if #rows == 0 then table.insert(children, text("none", "Nothing here.", "roost.hint")) end
+	if #rows > shown then table.insert(children, text("more", "+" .. (#rows - shown) .. " older", "roost.hint")) end
+	return ui.node("col", { key = "c" .. column.id, role = "roost.kanbanCol" }, children)
+end
+
+local function currentFilter()
+	local saved = tern.kv.get("mission-filter")
+	return if type(saved) == "string" and saved ~= "" then saved else nil
+end
+
+-- One chip per project, the busiest first, so many projects stay one click away.
+local function projectBar(projects, filter, total)
+	local chips = { button("fall", "All · " .. total, "mission-filter=*", "Every project", if filter == nil then "default" else nil) }
+	for _, project in projects do
+		local label = project.name .. " · " .. project.open .. (if project.you > 0 then " · " .. project.you .. " need you" else "")
+		table.insert(chips, button("f" .. string.gsub(project.name, "%W", ""), label, "mission-filter=" .. project.name,
+			"Only " .. project.name, if filter == project.name then "default" else nil))
 	end
-	return ui.node("col", { key = "t" .. string.gsub(row.id, "%W", ""), role = "roost.missionRow", mark = state[2] }, children)
+	return ui.node("row", { key = "filter", role = "roost.missionFilter" }, chips)
 end
 
 function Mission.render()
@@ -147,6 +213,7 @@ function Mission.render()
 			ui.node("row", { key = "titleGroup", role = "roost.titleGroup", grow = 1 }, {
 				text("title", Mission.TITLE, "roost.heading"),
 				text("total", tostring(count), "roost.count", { title = "Open tasks" }),
+				text("updated", if data.updated then "Updated " .. data.updated else "", "roost.sub", { title = "Refreshes every 30 s" }),
 			}),
 			button("goal", "New goal", "mission-goal", "Post a goal to a project; the lead plans it"),
 			ui.button("", {
@@ -164,17 +231,12 @@ function Mission.render()
 		table.insert(children, button("dir", "Choose Board folder", "mission-dir", "The folder holding the vinhlam-board checkout"))
 	end
 	if data.tasks then
-		local model = Mission.model(data.tasks)
-		local now = { text("h", "Now", "roost.folderName") }
-		for _, row in model.now do table.insert(now, taskRow(row)) end
-		if #model.now == 0 then table.insert(now, text("none", "Nothing waits for you.", "roost.hint")) end
-		table.insert(children, ui.node("col", { key = "now", role = "roost.missionSection" }, now))
-		for _, project in model.projects do
-			local rows = { text("h", project.name, "roost.folderName") }
-			for _, row in project.goals do table.insert(rows, taskRow(row)) end
-			for _, row in project.tasks do table.insert(rows, taskRow(row)) end
-			table.insert(children, ui.node("col", { key = "p" .. string.gsub(project.name, "%W", ""), role = "roost.missionSection" }, rows))
-		end
+		local filter = currentFilter()
+		local model = Mission.model(data.tasks, data.recent, data.names, filter)
+		table.insert(children, projectBar(model.projects, filter, count))
+		local columns = {}
+		for _, column in COLUMNS do table.insert(columns, columnNode(column, model.columns[column.id], filter == nil)) end
+		table.insert(children, ui.node("row", { key = "kanban", role = "roost.kanban" }, columns))
 	elseif not data.error then
 		table.insert(children, text("loading", "Reading the Board…", "roost.hint"))
 	end
@@ -193,23 +255,55 @@ local function draw(cx)
 	if found then cx.canvas:set(found, { view = Mission.render() }) end
 end
 
+local function decode(out)
+	local ok, decoded = pcall(tern.json.decode, out or "")
+	return if ok and type(decoded) == "table" then decoded else nil
+end
+
+-- Open tasks everywhere, the project list, then the latest build threads of the projects on show (for
+-- Done: `vb tasks` lists only open tasks, oldest first). Draws once every call has answered.
 function Mission.refresh(cx)
 	if data.loading then return end
 	data.loading = true
 	draw(cx)
-	vb({ "tasks", "--json" }, nil, function(out, err, nextCx)
+	local filter, pending, lastCx = currentFilter(), 2, cx
+	local function finish(nextCx)
+		lastCx = nextCx or lastCx
+		pending -= 1
+		if pending > 0 then return end
 		data.loading, data.at = false, tern.now()
-		if out then
-			local ok, decoded = pcall(tern.json.decode, out)
-			if ok and type(decoded) == "table" then
-				data.tasks, data.error = decoded.tasks or {}, nil
-			else
-				data.error = "The Board CLI answered something unexpected."
-			end
+		local ok, stamp = pcall(os.date, "%H:%M")
+		if ok then data.updated = stamp end
+		pcall(draw, lastCx)
+	end
+	vb({ "tasks", "--json", "-n", "200" }, nil, function(out, err, nextCx)
+		local decoded = decode(out)
+		if decoded then
+			data.tasks, data.error = decoded.tasks or {}, nil
 		else
-			data.error = err
+			data.error = err or "The Board CLI answered something unexpected."
 		end
-		if nextCx then draw(nextCx) elseif cx then pcall(draw, cx) end
+		finish(nextCx)
+	end)
+	vb({ "channels", "list", "--json" }, nil, function(out, _err, nextCx)
+		local decoded = decode(out)
+		if decoded then
+			local names = {}
+			for _, channel in decoded.channels or {} do
+				local name = string.match(channel.path or "", "^(.+)/build$")
+				if name then table.insert(names, name) end
+			end
+			data.names = names
+		end
+		for _, name in (if filter then { filter } else data.names or {}) do
+			pending += 1
+			vb({ "read", name .. "/build", "-n", "25", "--json" }, nil, function(readOut, _e, readCx)
+				local threads = decode(readOut)
+				if threads then data.recent[name] = threads.threads or {} end
+				finish(readCx)
+			end)
+		end
+		finish(nextCx)
 	end)
 end
 
@@ -253,7 +347,7 @@ local function newGoal(cx)
 		nextCx = nextCx or cx
 		local ok, decoded = pcall(tern.json.decode, out or "")
 		if err or not ok then hooks.report(nextCx, err or "Could not read the Board's projects.", "New goal") return end
-		local last, items = tern.kv.get("mission-project"), {}
+		local last, items = currentFilter() or tern.kv.get("mission-project"), {}
 		for _, channel in decoded.channels or {} do
 			local name = string.match(channel.path or "", "^(.+)/build$")
 			if name then table.insert(items, { label = name, project = name, current = name == last }) end
@@ -300,6 +394,11 @@ function Mission.action(ev, cx)
 	local act, value = ev.act, ev.value
 	if act == "mission-refresh" then
 		Mission.refresh(cx)
+	elseif act == "mission-filter" and value then
+		tern.kv.set("mission-filter", if value == "*" then "" else value)
+		data.at = 0 -- a refresh already running leaves this one to the next tick
+		draw(cx)
+		Mission.refresh(cx)
 	elseif act == "mission-close" then
 		Mission.toggle(cx)
 	elseif act == "mission-goal" then
@@ -324,6 +423,17 @@ function Mission.action(ev, cx)
 		return false
 	end
 	return true
+end
+
+do -- columns, dedupe (open task wins over its older read), filter and project order
+	local function item(id, channel, state, at) return { message = { id = id, channel = channel, task = { state = state }, createdAt = at } } end
+	local open = { item("a", "p/build", "claimed", "1"), item("b", "q/decisions", "blocked", "2") }
+	local recent = { p = { item("a", "p/build", "completed", "1"), item("c", "p/build", "completed", "3"), item("d", "p/build", "canceled", "4") } }
+	local all = Mission.model(open, recent, { "p", "q", "r" }, nil)
+	assert(#all.columns.working == 1 and #all.columns.you == 1 and #all.columns.done == 1 and all.columns.done[1].id == "c")
+	assert(all.projects[1].name == "q" and all.projects[2].name == "p" and all.projects[3].open == 0)
+	local only = Mission.model(open, recent, nil, "q")
+	assert(#only.columns.you == 1 and #only.columns.working == 0 and #only.columns.done == 0)
 end
 
 return Mission

@@ -292,16 +292,51 @@
 }
 
 /* Mission control tab */
-[data-role='roost.missionSection'] {
-  gap: 4px;
+/* Project chips, then the Kanban: columns side by side, stacking when the tab is narrow. */
+[data-role='roost.missionFilter'] {
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   padding-bottom: 8px;
 }
+[data-role='roost.kanban'] {
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+[data-role='roost.kanbanCol'] {
+  flex: 1 1 220px;
+  min-width: 200px;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--t4) 6%, transparent);
+}
+[data-role='roost.kanbanHead'] {
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 4px;
+}
+[data-role='roost.kanbanTitle'] {
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+[data-role='roost.kanbanTitle'][data-mark='bad'] { color: var(--bad); }
+[data-role='roost.kanbanTitle'][data-mark='warn'] { color: var(--warn); }
+[data-role='roost.kanbanTitle'][data-mark='ok'] { color: var(--ok); }
 [data-role='roost.missionRow'] {
-  gap: 2px;
-  padding: 4px 6px 4px 8px;
+  gap: 4px;
+  padding: 6px 6px 6px 8px;
   border-radius: 6px;
   border-left: 3px solid transparent;
-  background: color-mix(in srgb, var(--t4) 8%, transparent);
+  background: color-mix(in srgb, var(--t4) 10%, transparent);
+}
+[data-role='roost.missionRow'] [data-role='roost.hint'] {
+  max-height: 4.5em;
+  overflow: hidden;
 }
 /* Rows that need attention carry their state colour on the left edge. */
 [data-role='roost.missionRow'][data-mark='bad'] { border-left-color: var(--bad); }
@@ -328,7 +363,5 @@
 [data-role='roost.missionPill'][data-mark='kind'] { color: #12a594; background: color-mix(in srgb, #12a594 16%, transparent); }
 [data-role='roost.missionTitle'] {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
