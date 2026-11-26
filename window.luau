@@ -13,6 +13,9 @@ local picking = false
 local redraw_later
 -- The pane showing the panel; its own activity says nothing about a session.
 local slotPane = nil
+-- The folder or session picked up with "Move": {folder = path} or {session = id}.
+-- Canvases deliver clicks only (no drag events), so the next click places it.
+local moving = nil
 
 local function records(key)
 	local value = tern.kv.get(key)
@@ -258,6 +261,11 @@ local function model(cx)
 	local snap = Harness.snapshot(cx)
 	local cwds = sessionCwds(cx, snap)
 	local collapsed = records("collapsed")
+	-- Hand-set order from "Move"; folders and sessions not in it (new ones) come first.
+	local folderRank, sessionRank = {}, {}
+	for index, path in records("folder-order") do folderRank[path] = index end
+	for index, sid in records("session-order") do sessionRank[sid] = index end
+	local movingLabel = nil
 	local pinned = {}
 	for _, path in records("pinned") do
 		local norm = Folders.norm(path)
@@ -282,7 +290,9 @@ local function model(cx)
 				path = path, prefix = prefix, name = name, other = other, badge = badge, role = role,
 				pinned = table.find(pinned, path) ~= nil, order = table.find(pinned, path) or 0,
 				collapsed = collapsed[path] == true, sessions = {}, children = {}, newest = 0,
+				moving = if moving and moving.folder == path then true else nil,
 			}
+			if entry.moving then movingLabel = name end
 			byPath[path] = entry
 			table.insert(groups, entry)
 		end
@@ -307,11 +317,13 @@ local function model(cx)
 			local at = lastActive[key] or now
 			local hostName = Harness.host(cx, session.host) or "local"
 			local where = if cwd then Folders.short(cwd, home) else Folders.OTHER
+			local isMoving = moving and moving.session == session.id
+			if isMoving then movingLabel = session.name end
 			table.insert(entry.sessions, {
 				id = session.id, name = session.name, tabs = session.tabs, locked = session.locked,
 				current = session.current, agent = agent, sub = sub, where = where, host = hostName,
 				harness = { kind = harness.kind, label = harness.label, icon = harness.icon, model = harness.model },
-				at = at, age = Folders.age(math.max(0, now - at)),
+				at = at, age = Folders.age(math.max(0, now - at)), moving = if isMoving then true else nil,
 			})
 			if at > entry.newest then entry.newest = at end
 			known[key] = {
@@ -322,6 +334,9 @@ local function model(cx)
 	end
 	for _, entry in groups do
 		table.sort(entry.sessions, function(a, b)
+			local ra, rb = sessionRank[tostring(a.id)], sessionRank[tostring(b.id)]
+			if (ra ~= nil) ~= (rb ~= nil) then return rb ~= nil end
+			if ra then return ra < rb end
 			if a.at ~= b.at then return a.at > b.at end
 			local x, y = string.lower(a.name), string.lower(b.name)
 			if x ~= y then return x < y end
@@ -388,9 +403,12 @@ local function model(cx)
 	end
 	for _, entry in top do finish(entry) end
 	table.sort(top, function(a, b)
+		if a.other ~= b.other then return b.other end
+		local ra, rb = folderRank[a.path], folderRank[b.path]
+		if (ra ~= nil) ~= (rb ~= nil) then return rb ~= nil end
+		if ra then return ra < rb end
 		if a.pinned ~= b.pinned then return a.pinned end
 		if a.pinned then return a.order < b.order end
-		if a.other ~= b.other then return b.other end
 		if #a.sessions ~= #b.sessions then return #a.sessions > #b.sessions end
 		local x, y = string.lower(a.name), string.lower(b.name)
 		if x ~= y then return x < y end
@@ -409,8 +427,10 @@ local function model(cx)
 			age = Folders.age(math.max(0, now - (record.at or now))),
 		})
 	end
+	-- The picked-up item closed or went away: drop the move.
+	if not movingLabel then moving = nil end
 	local result = {
-		groups = top, total = total, spinning = spinning,
+		groups = top, total = total, spinning = spinning, moving = movingLabel,
 		settled = { open = tern.kv.get("settled-open") == true, count = #list, rows = rows },
 	}
 	result.live = live
@@ -477,8 +497,24 @@ local function viewData(cx)
 	return data, live
 end
 
--- The folders on show and the live session ids at the last draw, for the tick.
-local drawnPaths, drawnLive
+-- The folders on show, the live session ids and the drawn order at the last draw, for the tick and "Move".
+local drawnPaths, drawnLive, drawnOrder
+
+-- Top-level folder paths ("Other" stays last) and each folder's session ids, in drawn order.
+local function orderOf(data)
+	local order = { folders = {}, sessions = {} }
+	local function walk(entry)
+		local ids = {}
+		for _, session in entry.sessions do table.insert(ids, tostring(session.id)) end
+		order.sessions[entry.path] = ids
+		for _, child in entry.children do walk(child) end
+	end
+	for _, entry in data.groups do
+		if not entry.other then table.insert(order.folders, entry.path) end
+		walk(entry)
+	end
+	return order
+end
 
 local function draw(cx)
 	local pane = slot(cx)
@@ -490,7 +526,7 @@ local function draw(cx)
 	end
 	if not ready then return end
 	local data, live = viewData(cx)
-	drawnPaths, drawnLive = shownPaths(data), live
+	drawnPaths, drawnLive, drawnOrder = shownPaths(data), live, orderOf(data)
 	local signature = tern.json.encode(data)
 	if rendered[pane] == signature then return end
 	cx.canvas:set(pane, { view = view.render(data), dock = view.dock(data) })
@@ -1141,10 +1177,46 @@ tern.command({ id = "rename", title = "Roost: Rename current session", icon = "r
 	renameSession(cx, cx.sessions:current().id)
 end })
 
+local function placeFolder(path, target)
+	local moved = drawnOrder and Folders.move(drawnOrder.folders, path, target)
+	if moved and path ~= target then tern.kv.set("folder-order", moved) end
+end
+
+-- Sessions follow their working directory, so they only move among their folder's sessions.
+local function placeSession(cx, id, target)
+	if not drawnOrder or id == target then return end
+	for _, ids in drawnOrder.sessions do
+		local moved = Folders.move(ids, tostring(id), tostring(target))
+		if moved then
+			local list = {}
+			for _, sid in records("session-order") do
+				if drawnLive[sid] and not table.find(moved, sid) then table.insert(list, sid) end
+			end
+			for _, sid in moved do table.insert(list, sid) end
+			tern.kv.set("session-order", list)
+			return
+		end
+	end
+	cx:toast("info", "Sessions stay in their folder", "Place it among its own folder’s sessions.")
+end
+
 tern.on("canvas_action", function(ev, cx)
 	if not requireLocal(cx) then return true end
 	local act, value = ev.act, ev.value
 	local path = Folders.unhex(value)
+	-- A pick-up from "Move": a click on a row of the same kind places it there; any other click drops the move.
+	if moving then
+		local picked = moving
+		moving = nil
+		redraw(cx)
+		if picked.session and act == "switch" then
+			placeSession(cx, picked.session, tonumber(value))
+			return true
+		elseif picked.folder and act == "collapse" and path then
+			placeFolder(picked.folder, path)
+			return true
+		end
+	end
 	if act == "find" then findSession(cx)
 	elseif act == "new" then newSession(cx)
 	elseif act == "add" then
@@ -1161,6 +1233,10 @@ tern.on("canvas_action", function(ev, cx)
 		tern.kv.set("settled-open", tern.kv.get("settled-open") ~= true)
 		redraw(cx)
 	elseif act == "restore" and value then restoreSettled(cx, value)
+	elseif act == "Move" then
+		local id, folder = view.sessionId(ev.node), view.folderPath(ev.node)
+		moving = if id then { session = id } elseif folder then { folder = folder } else nil
+		redraw(cx)
 	-- Menu entries show their action verbatim, so these read as titled.
 	elseif act == "Rename" then
 		local id = view.sessionId(ev.node)

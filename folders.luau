@@ -84,6 +84,17 @@ function Folders.age(seconds)
 	return tostring(math.floor(seconds / 86400)) .. "d"
 end
 
+-- `list` with `item` moved into `target`'s place: after it when moving down,
+-- before it when moving up, as a drag would drop it. nil when either is missing.
+function Folders.move(list, item, target)
+	local out = table.clone(list)
+	local from, to = table.find(out, item), table.find(out, target)
+	if not from or not to then return nil end
+	table.remove(out, from)
+	table.insert(out, to, item)
+	return out
+end
+
 -- A folder's label in two parts: its dimmed parent (trailing slash included, may
 -- be cut to fit) and its name, which always stays whole: "~/exo" → "~/", "exo".
 function Folders.parts(path, home)
@@ -116,5 +127,8 @@ do
 end
 assert(Folders.age(5) == "now" and Folders.age(720) == "12m" and Folders.age(4 * 3600 + 5) == "4h")
 assert(Folders.age(2 * 86400) == "2d" and Folders.age(31 * 86400 + 9) == "31d" and Folders.age(nil) == "")
+assert(table.concat(Folders.move({ "a", "b", "c" }, "a", "c"), "") == "bca")
+assert(table.concat(Folders.move({ "a", "b", "c" }, "c", "a"), "") == "cab")
+assert(Folders.move({ "a" }, "a", "z") == nil)
 
 return Folders

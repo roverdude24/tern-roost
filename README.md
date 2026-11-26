@@ -26,6 +26,8 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 **Rows.** Dot (grey idle, green pulsing while an agent works, blue while one waits for you), name, a harness icon (omp, Claude Code, Codex, Pi, Hermes, Gemini, OpenCode, Aider, else a terminal) and the time since the session was last active (`now`, `12m`, `4h`, `2d`, `31d`). Hover a row for its folder, host machine, harness and model. Within a folder the most recently active session comes first. In a narrow panel the folder path, then the harness icon give way so names stay readable; folder names end in `…` when they still don't fit.
 
+**Order.** Right-click › *Move* on a folder or session picks it up; then click the folder or session whose place it should take (click it again to cancel). Tern panels take clicks, not drags, so this is Roost's drag and drop. Sessions move only within their folder. Your order sticks; new folders and sessions appear above it.
+
 **Names.** A session still named after its folder (the name Tern and Roost give a new one) takes the title its agent sets, minus the leading icon, so omp's `OMNI: Evaluate openomni and omniget repos` becomes the session's name, in the panel and in Tern's tab bar alike. It follows the title as the agent retitles. Rename a session yourself (in Roost or Tern) and Roost leaves that name alone.
 
 **Activity.** Tern gives no timestamps, so Roost stamps a session whenever a command starts or finishes, an agent changes state, a title or directory changes, or you focus it. Sessions that predate Roost start from how long `tern inspect` says they have been quiet. Stamps are saved in the plugin's store.
@@ -38,12 +40,12 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 | --- | --- |
 | Header icons | Find session, New session (pick a pinned or in-use folder, or browse), Add folder (pin), Refresh |
 | Folder (hover) | pin, `+` new session, ✦ new session running `omp`, open in Finder |
-| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, New worktree session (repositories), Remove worktree (worktrees) |
-| Session (right-click) | Rename, New tab here, Lock or Unlock, Settle, Close |
+| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session (repositories), Remove worktree (worktrees) |
+| Session (right-click) | Rename, Move, New tab here, Lock or Unlock, Settle, Close |
 | Palette | Show or hide Roost, Roost: Find session, Roost: New session in folder, Roost: Rename current session |
 
 *New worktree session* asks for a branch name, runs `git worktree add` into a sibling folder (`<repo>-<branch>`) and opens a session there. *Remove worktree* refuses while the worktree has uncommitted changes or a session is open in it, and always keeps the branch.
 
 New tabs follow Settings › New tabs and splits open (shell or agent), like ⌘T.
 
-Pinned folders, collapsed state, panel width, activity and Settled live in the plugin's key-value store.
+Pinned folders, collapsed state, your order, panel width, activity and Settled live in the plugin's key-value store.

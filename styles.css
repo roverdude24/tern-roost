@@ -121,6 +121,20 @@
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
+/* Picked up with "Move": the next click places it. */
+[data-role='roost.session'][data-mark='moving'],
+[data-role='roost.folderHeader'][data-mark='moving'] {
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+[data-role='roost.movingHint'] {
+  color: var(--accent);
+  font-size: 0.9em;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
 [data-role='roost.row'] {
   gap: 1px;
   padding: 4px 8px;

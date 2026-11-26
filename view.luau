@@ -56,7 +56,7 @@ end
 
 local function sessionNode(session)
 	local menu = {
-		"Rename", "New tab here",
+		"Rename", "Move", "New tab here",
 		if session.locked then "Unlock session" else "Lock session",
 		"Settle", "Close session",
 	}
@@ -93,7 +93,7 @@ local function sessionNode(session)
 	}, rowChildren)
 	return ui.node("col", {
 		key = "s" .. tostring(session.id), role = "roost.session",
-		mark = if session.current then "pick" else nil,
+		mark = if session.moving then "moving" elseif session.current then "pick" else nil,
 	}, { row })
 end
 
@@ -170,6 +170,7 @@ function folderNode(group)
 			table.insert(menu, "Remove worktree")
 		else
 			table.insert(menu, if group.pinned then "Unpin folder" else "Pin folder")
+			table.insert(menu, "Move")
 			if group.git then table.insert(menu, "New worktree session") end
 		end
 	end
@@ -177,7 +178,7 @@ function folderNode(group)
 	local children = {
 		ui.node("row", {
 			key = "header", role = "roost.folderHeader", actions = if menu then { menu = menu } else nil,
-			title = tip,
+			title = tip, mark = if group.moving then "moving" else nil,
 		}, header),
 	}
 	if not group.collapsed then
@@ -262,6 +263,10 @@ function View.render(model)
 				"roost.iconButton", { busy = model.spinning }),
 		}),
 	}
+	if model.moving then
+		table.insert(children, text("moving", "Moving " .. model.moving
+			.. " · click where it goes, or it again to stay", "roost.movingHint"))
+	end
 	for _, group in ipairs(model.groups) do
 		table.insert(children, folderNode(group))
 	end
