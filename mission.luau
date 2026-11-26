@@ -165,15 +165,67 @@ local function card(row, showProject)
 	}
 	if row.reason and (row.state == "blocked" or row.state == "failed") then table.insert(children, text("reason", row.reason, "roost.hint")) end
 	if row.role == "epic" and row.last then table.insert(children, text("last", "Lead: " .. row.last, "roost.hint")) end
-	local actions = { button("open", "Open", "mission-open=" .. row.id, "Show the whole thread as a note") }
-	if row.state == "blocked" or (row.decision and row.state ~= "completed") then
+	local selected = data.selected == row.id
+	return ui.node("col", {
+		key = "t" .. string.gsub(row.id, "%W", ""), role = "roost.missionRow", mark = if selected then "pick" else state[2],
+		title = "Show this thread and its actions", actions = { click = "mission-select=" .. row.id },
+	}, children)
+end
+
+local function needsYou(row)
+	return row.state == "blocked" or row.state == "failed" or (row.decision and row.state ~= "completed" and row.state ~= "canceled")
+end
+
+local function stamp(iso)
+	local month, day, hour, minute = string.match(iso or "", "^%d+%-(%d+)%-(%d+)T(%d+):(%d+)")
+	return if month then day .. "/" .. month .. " " .. hour .. ":" .. minute .. " UTC" else ""
+end
+
+-- The sub-panel beside the board: the selected task's actions, then its whole thread.
+local function detail(row)
+	local state = STATES[row.state] or { row.state, "dim" }
+	local kind = (if row.role == "epic" then "goal" else row.role or "task") .. (if row.lane then " · " .. row.lane else "")
+	local id = row.id
+	local actions = { button("reply", "Reply…", "mission-answer=" .. id, "Write a reply in this thread", "default") }
+	if needsYou(row) then
 		for index, option in row.options do
-			table.insert(actions, button("o" .. index, option.key .. " — " .. option.label, "mission-answer=" .. row.id .. "|" .. option.key, "Reply " .. option.key))
+			table.insert(actions, button("o" .. index, option.key .. " — " .. option.label, "mission-answer=" .. id .. "|" .. option.key, "Reply " .. option.key))
 		end
-		table.insert(actions, button("answer", "Answer…", "mission-answer=" .. row.id, "Write a reply in this thread"))
 	end
+	if row.state == "blocked" then table.insert(actions, button("unblock", "Unblock", "mission-task=unblock|" .. id, "Lift the hold: ready again")) end
+	if row.state == "failed" then table.insert(actions, button("reopen", "Reopen", "mission-task=reopen|" .. id, "Make it ready again")) end
+	if row.state ~= "completed" and row.state ~= "canceled" then
+		table.insert(actions, button("cancel", "Cancel…", "mission-task=cancel|" .. id, "Cancel the task, with a reason"))
+	end
+	table.insert(actions, button("note", "As note", "mission-open=" .. id, "Open the thread as a note"))
+	local children = {
+		ui.node("row", { key = "head", role = "roost.missionHead" }, {
+			text("state", state[1], "roost.missionPill", { mark = state[2] }),
+			text("project", row.project, Badge.role(row.project)),
+			text("kind", kind, "roost.missionPill", { mark = if row.decision then "warn" else "kind", grow = 1 }),
+			ui.button("", { key = "x", icon = "x", size = "sm", variant = "quiet", title = "Close details", aria = "Close details", actions = { click = "mission-select=" } }),
+		}),
+		text("title", row.title, "roost.detailTitle"),
+	}
+	if row.reason then table.insert(children, text("reason", row.reason, "roost.hint")) end
 	table.insert(children, ui.node("row", { key = "actions", role = "roost.missionAnswers" }, actions))
-	return ui.node("col", { key = "t" .. string.gsub(row.id, "%W", ""), role = "roost.missionRow", mark = state[2] }, children)
+	local thread = data.thread
+	if thread and thread.id == id then
+		local messages = {}
+		if thread.message then table.insert(messages, thread.message) end
+		for _, message in thread.replies or {} do table.insert(messages, message) end
+		table.insert(children, text("count", #messages .. " messages, newest last", "roost.sub"))
+		for index, message in messages do
+			local author = message.author and (message.author.name or message.author.handle) or "?"
+			table.insert(children, ui.node("col", { key = "m" .. index, role = "roost.missionMsg" }, {
+				text("who", author .. " · " .. stamp(message.createdAt), "roost.sub"),
+				text("body", trim(message.text), "roost.missionBody"),
+			}))
+		end
+	else
+		table.insert(children, text("loading", data.threadError or "Reading the thread…", "roost.hint"))
+	end
+	return ui.node("col", { key = "detail", role = "roost.missionDetail" }, children)
 end
 
 local function columnNode(column, rows, showProject)
@@ -234,9 +286,14 @@ function Mission.render()
 		local filter = currentFilter()
 		local model = Mission.model(data.tasks, data.recent, data.names, filter)
 		table.insert(children, projectBar(model.projects, filter))
-		local columns = {}
-		for _, column in COLUMNS do table.insert(columns, columnNode(column, model.columns[column.id], filter == nil)) end
-		table.insert(children, ui.node("row", { key = "kanban", role = "roost.kanban" }, columns))
+		local columns, selected = {}, nil
+		for _, column in COLUMNS do
+			table.insert(columns, columnNode(column, model.columns[column.id], filter == nil))
+			for _, row in model.columns[column.id] do if row.id == data.selected then selected = row end end
+		end
+		local board = { ui.node("row", { key = "kanban", role = "roost.kanban", grow = 1 }, columns) }
+		if selected then table.insert(board, detail(selected)) end
+		table.insert(children, ui.node("row", { key = "board", role = "roost.missionBoard" }, board))
 	elseif not data.error then
 		table.insert(children, text("loading", "Reading the Board…", "roost.hint"))
 	end
@@ -260,6 +317,20 @@ local function decode(out)
 	return if ok and type(decoded) == "table" then decoded else nil
 end
 
+-- Reads the selected task's whole thread into the sub-panel.
+local function loadThread(cx, id)
+	vb({ "read", id, "--json" }, nil, function(out, err, nextCx)
+		if data.selected ~= id then return end
+		local decoded = decode(out)
+		if decoded then
+			decoded.id, data.thread, data.threadError = id, decoded, nil
+		else
+			data.threadError = err or "Could not read the thread."
+		end
+		pcall(draw, nextCx or cx)
+	end)
+end
+
 -- Open tasks everywhere, the project list, then the latest build threads of the projects on show (for
 -- Done: `vb tasks` lists only open tasks, oldest first). Draws once every call has answered.
 function Mission.refresh(cx)
@@ -267,6 +338,7 @@ function Mission.refresh(cx)
 	data.loading = true
 	draw(cx)
 	local filter, pending, lastCx = currentFilter(), 2, cx
+	if data.selected then loadThread(cx, data.selected) end
 	local function finish(nextCx)
 		lastCx = nextCx or lastCx
 		pending -= 1
@@ -338,6 +410,21 @@ local function reply(cx, id, answer)
 		nextCx = nextCx or cx
 		if err then hooks.report(nextCx, err, "Answer not sent") return end
 		nextCx:toast("info", "Answer sent", "The lead picks it up on its next turn.")
+		if data.selected == id then loadThread(nextCx, id) end
+		Mission.refresh(nextCx)
+	end)
+end
+
+-- Unblock, reopen or cancel (with a reason) a task you own: `vb tasks <verb> <id> [reason]`.
+local function taskVerb(cx, verb, id, reason)
+	local args = { "tasks", verb, id }
+	if reason then table.insert(args, reason) end
+	vb(args, nil, function(_, err, nextCx)
+		nextCx = nextCx or cx
+		if err then hooks.report(nextCx, err, "Task not changed") return end
+		nextCx:toast("info", "Task " .. (if verb == "cancel" then "canceled" elseif verb == "unblock" then "unblocked" else "reopened"), "")
+		data.at = 0
+		if data.selected == id then loadThread(nextCx, id) end
 		Mission.refresh(nextCx)
 	end)
 end
@@ -399,6 +486,21 @@ function Mission.action(ev, cx)
 		data.at = 0 -- a refresh already running leaves this one to the next tick
 		draw(cx)
 		Mission.refresh(cx)
+	elseif act == "mission-select" then
+		-- Clicking the selected card again, or the sub-panel's ✕, closes the sub-panel.
+		local id = if value and value ~= "" and value ~= data.selected then value else nil
+		data.selected, data.thread, data.threadError = id, nil, nil
+		draw(cx)
+		if id then loadThread(cx, id) end
+	elseif act == "mission-task" and value then
+		local verb, id = string.match(value, "^(%a+)|(.+)$")
+		if verb == "cancel" then
+			cx:prompt({ placeholder = "Why cancel it? (sent with the cancel)", action = "cancel task" }):next(function(reason, _e, nextCx)
+				if nextCx and trim(reason) ~= "" then taskVerb(nextCx, verb, id, trim(reason)) end
+			end)
+		elseif verb then
+			taskVerb(cx, verb, id)
+		end
 	elseif act == "mission-close" then
 		Mission.toggle(cx)
 	elseif act == "mission-goal" then

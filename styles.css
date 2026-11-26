@@ -341,6 +341,43 @@
 /* Rows that need attention carry their state colour on the left edge. */
 [data-role='roost.missionRow'][data-mark='bad'] { border-left-color: var(--bad); }
 [data-role='roost.missionRow'][data-mark='warn'] { border-left-color: var(--warn); }
+[data-role='roost.missionRow'] { cursor: pointer; }
+[data-role='roost.missionRow']:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+[data-role='roost.missionRow'][data-mark='pick'] {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+/* Board and the selected task's sub-panel side by side; the panel drops below when the tab is narrow. */
+[data-role='roost.missionBoard'] {
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+[data-role='roost.missionDetail'] {
+  flex: 0 1 440px;
+  min-width: 300px;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--t4) 8%, transparent);
+}
+[data-role='roost.detailTitle'] {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+[data-role='roost.missionMsg'] {
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--t4) 10%, transparent);
+}
+[data-role='roost.missionBody'] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.92em;
+  color: var(--t2);
+}
 [data-role='roost.missionHead'],
 [data-role='roost.missionAnswers'] {
   align-items: center;
