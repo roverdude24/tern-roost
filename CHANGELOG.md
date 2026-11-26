@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keys: `⌥J` / `⌥K` step to the next / previous session in panel order (wrapping), `⌥⇧1`–`⌥⇧9` jump to session 1–9.
+- A session whose agent waits for you sits at the top of its folder.
+- macOS alert when an agent finishes, fails or needs your input, only while Tern is in the background.
+
 - *New session* asks which host first when more than one is connected, then lists that host's folders plus *Type a path…* (and *Choose folder…* on this Mac), switches to the host and opens the session there.
 - Remote folders get `+`, ✦, *New session here* and *New omp session here*, opening on their own host.
 - Folder actions on this Mac work while a remote host is shown: Roost switches back first.

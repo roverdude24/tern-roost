@@ -352,6 +352,8 @@ local function model(cx)
 	end
 	for _, entry in groups do
 		table.sort(entry.sessions, function(a, b)
+			-- A session waiting for you stays on top of its folder, above any placed order.
+			if (a.agent == "waiting") ~= (b.agent == "waiting") then return a.agent == "waiting" end
 			local ra, rb = sessionRank[tostring(a.id)], sessionRank[tostring(b.id)]
 			if (ra ~= nil) ~= (rb ~= nil) then return rb ~= nil end
 			if ra then return ra < rb end
@@ -1288,6 +1290,25 @@ tern.command({ id = "rename", title = "Roost: Rename current session", icon = "r
 	renameSession(cx, cx.sessions:current().id)
 end })
 
+-- Steps through sessions in panel order, wrapping at the ends.
+local function stepSession(cx, delta)
+	local rows = allSessions(cx)
+	if #rows == 0 then return end
+	local here, at = cx.sessions:current().id, 0
+	for index, row in rows do
+		if row.id == here then at = index end
+	end
+	switchTo(cx, rows[if at == 0 then 1 else (at - 1 + delta) % #rows + 1].id)
+end
+tern.command({ id = "next", title = "Roost: Next session", icon = "folder", keys = { "alt+j" }, run = function(cx) stepSession(cx, 1) end })
+tern.command({ id = "previous", title = "Roost: Previous session", icon = "folder", keys = { "alt+k" }, run = function(cx) stepSession(cx, -1) end })
+for n = 1, 9 do
+	tern.command({ id = "jump-" .. n, title = "Roost: Session " .. n, icon = "folder", keys = { "alt+shift+" .. n }, run = function(cx)
+		local row = allSessions(cx)[n]
+		if row then switchTo(cx, row.id) end
+	end })
+end
+
 local function placeFolder(path, target)
 	local moved = drawnOrder and Folders.move(drawnOrder.folders, path, target)
 	if moved and path ~= target then tern.kv.set("folder-order", moved) end
@@ -1433,6 +1454,30 @@ for _, name in { "tab_created", "tab_closed", "pane_created", "pane_closed" } do
 		followAndDraw(cx)
 	end)
 end
+-- A macOS alert when an agent finishes or needs you, only while Tern is in the background.
+local alertedAt = {}
+local function alert(cx, pane, reason)
+	if tern.runtime.os ~= "macos" then return end
+	local key, now = tostring(pane) .. reason, tern.now()
+	if alertedAt[key] and now - alertedAt[key] < 10000 then return end
+	alertedAt[key] = now
+	local name = "Agent"
+	local info = cx.session:pane(pane)
+	for _, tab in cx.session:tabs() do
+		if info and tab.id == info.tab then
+			local session = sessionsById(cx)[tostring(tab.session)]
+			if session then name = session.name end
+		end
+	end
+	-- lsappinfo reads the frontmost app without a permission prompt; text goes in as argv, never script text.
+	tern.process.run({ "/bin/sh", "-c", '/usr/bin/lsappinfo info -only bundleid "$(/usr/bin/lsappinfo front)"' }, { timeout_ms = 2000 }, function(result)
+		if result and result.status == 0 and string.find(result.stdout or "", "stencil.tern", 1, true) then return end
+		tern.process.run({ "/usr/bin/osascript", "-e", "on run argv", "-e", 'display notification (item 1 of argv) with title "Roost" subtitle (item 2 of argv)', "-e", "end run", reason, name }, { timeout_ms = 3000 }, function() end)
+	end)
+end
+tern.on("agent_finished", function(ev, cx)
+	if ev.result == "done" or ev.result == "failed" then pcall(alert, cx, ev.pane, if ev.result == "done" then "Finished" else "Failed") end
+end)
 local paneCwd = {}
 -- Work in a pane stamps its session; a folder or agent change draws soon, off the hook's budget.
 for _, name in { "command_started", "command_finished", "title", "cwd", "agent_state" } do
@@ -1444,6 +1489,7 @@ for _, name in { "command_started", "command_finished", "title", "cwd", "agent_s
 			gitAt = {}
 			redraw(cx)
 		elseif name == "agent_state" then
+			if ev.new == "waiting_input" and ev.old ~= "waiting_input" then pcall(alert, cx, ev.pane, "Needs your input") end
 			redraw(cx)
 		end
 	end)
