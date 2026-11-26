@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.9
+
 - Reorder folders and sessions: right-click › Move picks one up (dashed outline, a hint at the top), then click the folder or session whose place it should take. Tern panels deliver clicks, not drags, so this stands in for drag and drop. Sessions move within their own folder; worktrees keep name order. New folders and sessions show above the ones you placed.
 
 ## 0.2.8
