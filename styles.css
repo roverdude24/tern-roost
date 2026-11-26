@@ -298,24 +298,34 @@
 }
 [data-role='roost.missionRow'] {
   gap: 2px;
-  padding: 4px 6px;
+  padding: 4px 6px 4px 8px;
   border-radius: 6px;
+  border-left: 3px solid transparent;
   background: color-mix(in srgb, var(--t4) 8%, transparent);
 }
+/* Rows that need attention carry their state colour on the left edge. */
+[data-role='roost.missionRow'][data-mark='bad'] { border-left-color: var(--bad); }
+[data-role='roost.missionRow'][data-mark='warn'] { border-left-color: var(--warn); }
 [data-role='roost.missionHead'],
 [data-role='roost.missionAnswers'] {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
-[data-role='roost.missionState'] {
+/* Pills after pi-emphasis: red wrong, yellow look here, green settled, cyan kind of work. */
+[data-role='roost.missionPill'] {
   flex-shrink: 0;
   font-size: 0.8em;
-  padding: 1px 7px;
+  font-weight: 600;
+  padding: 1px 8px;
   border-radius: 999px;
-  color: var(--t2);
+  color: var(--t3);
   background: color-mix(in srgb, var(--t4) 18%, transparent);
 }
+[data-role='roost.missionPill'][data-mark='bad'] { color: var(--bad); background: color-mix(in srgb, var(--bad) 18%, transparent); }
+[data-role='roost.missionPill'][data-mark='warn'] { color: var(--warn); background: color-mix(in srgb, var(--warn) 18%, transparent); }
+[data-role='roost.missionPill'][data-mark='ok'] { color: var(--ok); background: color-mix(in srgb, var(--ok) 18%, transparent); }
+[data-role='roost.missionPill'][data-mark='kind'] { color: #12a594; background: color-mix(in srgb, #12a594 16%, transparent); }
 [data-role='roost.missionTitle'] {
   min-width: 0;
   overflow: hidden;

@@ -454,7 +454,7 @@ local function model(cx)
 		groups = top, total = total, spinning = spinning, moving = movingLabel,
 		settled = { open = tern.kv.get("settled-open") == true, count = #list, rows = rows },
 	}
-	result.live = live
+	result.live, result.missionOpen = live, Mission.isOpen(cx)
 	return result
 end
 
@@ -1286,7 +1286,7 @@ end
 
 tern.command({ id = "toggle", title = "Show or hide Roost", icon = "folder", keys = { "cmd+alt+shift+l" }, run = togglePanel })
 Mission.setup({ report = report, chooseFolder = chooseFolder })
-tern.command({ id = "mission", title = "Roost: Mission control", icon = "list-checks", run = Mission.open })
+tern.command({ id = "mission", title = "Roost: Show or hide Mission control", icon = "list-checks", run = Mission.toggle })
 tern.command({ id = "find", title = "Roost: Find session", icon = "search", run = findSession })
 tern.command({ id = "new", title = "Roost: New session in folder", icon = "folder-plus", run = newSession })
 tern.command({ id = "rename", title = "Roost: Rename current session", icon = "rename", run = function(cx)
@@ -1354,7 +1354,7 @@ tern.on("canvas_action", function(ev, cx)
 	end
 	if act == "find" then findSession(cx)
 	elseif act == "new" then newSession(cx)
-	elseif act == "mission" then Mission.open(cx)
+	elseif act == "mission" then Mission.toggle(cx)
 	elseif act == "add" then
 		chooseFolder(cx, "Choose a folder to pin in Roost", pinFolder)
 	elseif act == "refresh" then refreshByHand(cx)

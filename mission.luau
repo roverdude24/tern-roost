@@ -109,12 +109,20 @@ local function button(key, label, action, title)
 	return ui.button(label, { key = key, size = "sm", variant = "quiet", title = title or label, actions = { click = action } })
 end
 
+-- Board task states as coloured pills, after pi-emphasis: red = wrong, yellow = look here, green = settled.
+local STATES = {
+	failed = { "✗ Failed", "bad" }, blocked = { "■ Blocked", "bad" },
+	waiting = { "◷ Waiting", "warn" }, claimed = { "◐ In progress", "warn" }, open = { "○ Todo", "warn" },
+	ready = { "● Ready", "ok" }, completed = { "✓ Done", "ok" }, canceled = { "– Canceled", "dim" },
+}
+
 local function taskRow(row)
-	local who = if row.role == "epic" then "goal" else (row.role or "task") .. (if row.lane then " · " .. row.lane else "")
+	local state = STATES[row.state] or { row.state, "dim" }
+	local kind = (if row.role == "epic" then "goal" else row.role or "task") .. (if row.lane then " · " .. row.lane else "")
 	local children = {
 		ui.node("row", { key = "head", role = "roost.missionHead" }, {
-			text("state", row.state, "roost.missionState", { title = "Board state" }),
-			text("who", who, "roost.sub"),
+			text("state", state[1], "roost.missionPill", { mark = state[2], title = "Board state: " .. row.state }),
+			text("kind", kind, "roost.missionPill", { mark = if row.decision then "warn" else "kind" }),
 			text("title", row.title, "roost.missionTitle", { grow = 1 }),
 			button("open", "Open", "mission-open=" .. row.id, "Show the whole thread as a note"),
 		}),
@@ -129,7 +137,7 @@ local function taskRow(row)
 		table.insert(answers, button("answer", "Answer…", "mission-answer=" .. row.id, "Write a reply in this thread"))
 		table.insert(children, ui.node("row", { key = "answers", role = "roost.missionAnswers" }, answers))
 	end
-	return ui.node("col", { key = "t" .. string.gsub(row.id, "%W", ""), role = "roost.missionRow" }, children)
+	return ui.node("col", { key = "t" .. string.gsub(row.id, "%W", ""), role = "roost.missionRow", mark = state[2] }, children)
 end
 
 function Mission.render()
@@ -144,6 +152,10 @@ function Mission.render()
 			ui.button("", {
 				key = "refresh", icon = "refresh", size = "sm", variant = "quiet", busy = data.loading,
 				title = if data.loading then "Refreshing…" else "Refresh", aria = "Refresh", actions = { click = "mission-refresh" },
+			}),
+			ui.button("", {
+				key = "close", icon = "x", size = "sm", variant = "quiet",
+				title = "Close Mission control", aria = "Close Mission control", actions = { click = "mission-close" },
 			}),
 		}),
 	}
@@ -212,6 +224,16 @@ function Mission.open(cx)
 	Mission.refresh(cx)
 end
 
+function Mission.isOpen(cx)
+	return pane(cx) ~= nil
+end
+
+-- Header button, close button and palette command: closes the tab when it is open, opens it otherwise.
+function Mission.toggle(cx)
+	local found = pane(cx)
+	if found then cx.layout:close(found) else Mission.open(cx) end
+end
+
 -- Called from Roost's tick: refreshes an open tab every REFRESH_MS.
 function Mission.tick(cx)
 	if not data.loading and tern.now() - data.at > REFRESH_MS and pane(cx) then Mission.refresh(cx) end
@@ -278,6 +300,8 @@ function Mission.action(ev, cx)
 	local act, value = ev.act, ev.value
 	if act == "mission-refresh" then
 		Mission.refresh(cx)
+	elseif act == "mission-close" then
+		Mission.toggle(cx)
 	elseif act == "mission-goal" then
 		newGoal(cx)
 	elseif act == "mission-open" and value then
