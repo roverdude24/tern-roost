@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Mission control tab over the VinhLam Board (`vb`): Now (decisions waiting, A/B answers), goals and tasks per project with state and lane, New goal (posted to `<project>/build` for the lead to plan), Open thread as a note, 30 s refresh.
+- Mission control toggles: the header icon (lit while open), palette *Roost: Show or hide Mission control* and the ✕ in the tab open or close it. Board states show as coloured pills (red Failed/Blocked, yellow Waiting/In progress/Todo, green Ready/Done), kind of work in cyan, rows needing attention marked on the left edge.
 
 - Keys: `⌥J` / `⌥K` step to the next / previous session in panel order (wrapping), `⌥⇧1`–`⌥⇧9` jump to session 1–9.
 - A session whose agent waits for you sits at the top of its folder.
