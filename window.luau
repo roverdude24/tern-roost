@@ -24,12 +24,16 @@ local function records(key)
 	return value
 end
 
-local function localHost(cx)
-	return cx.hosts:current().kind == "local"
+-- This Mac's host id; sessions:create and the folder picker only reach this host.
+local function localHostId(cx)
+	for _, host in cx.hosts:list() do
+		if host.kind == "local" then return host.id end
+	end
+	return nil
 end
 
 local function requireLocal(cx)
-	if localHost(cx) then return true end
+	if cx.hosts:current().kind == "local" then return true end
 	cx:toast("error", "Local host required", "Switch to the local host.")
 	return false
 end
@@ -301,10 +305,7 @@ local function model(cx)
 	local total = 0
 	local live = {}
 	-- Every attached host's sessions; a remote one carries its host name, shown on the row once two hosts appear.
-	local localId, hostNames, hostCount, rows = nil, {}, 0, {}
-	for _, host in cx.hosts:list() do
-		if host.kind == "local" then localId = host.id end
-	end
+	local localId, hostNames, hostCount, rows = localHostId(cx), {}, 0, {}
 	for _, session in cx.sessions:list() do
 		total += 1
 		local key = tostring(session.id)
@@ -486,13 +487,16 @@ local function rails(cx)
 	return set
 end
 
--- The window's one Roost panel: its canvas. Adopts what a reload left open
--- and closes any extra, so a window never shows two.
+-- The Roost panel on the shown host: its canvas. Each host keeps its own (a canvas
+-- cannot move between machines); adopts what a reload left open and closes any
+-- extra on that host, so it never shows two.
 local function slot(cx)
-	if slotPane and not cx.session:pane(slotPane) then slotPane = nil end
+	local here = cx.hosts:current().panes
+	local function mine(pane) return cx.session:pane(pane) ~= nil and table.find(here, pane) ~= nil end
+	if slotPane and not mine(slotPane) then slotPane = nil end
 	local found = {}
 	for _, canvas in cx.canvas:list() do
-		if isNavigator(canvas) and cx.session:pane(canvas.pane) then table.insert(found, canvas.pane) end
+		if isNavigator(canvas) and mine(canvas.pane) then table.insert(found, canvas.pane) end
 	end
 	slotPane = slotPane or found[1]
 	for _, pane in found do
@@ -657,14 +661,23 @@ local function setWantPanel(want)
 	tern.kv.set("panel-open", want)
 end
 
--- Opens a fresh panel in `tab`.
-local function openPanel(cx, tab)
+-- Hosts where a panel would not open; `follow` stops retrying there until you ask for it.
+local panelBlocked = {}
+
+-- Opens a fresh panel in `tab`. `quiet` (automatic opens) logs a failure instead of toasting it.
+local function openPanel(cx, tab, quiet)
 	local data = viewData(cx)
 	local pane, err = cx.canvas:open({
 		title = NAVIGATOR.title, about = NAVIGATOR.about,
 		view = view.render(data), dock = view.dock(data), how = "beside", focus = false,
 	})
-	if not pane then report(cx, err or "Could not open the Roost panel"); return nil end
+	local host = cx.hosts:current()
+	panelBlocked[host.id] = if pane then nil else true
+	if not pane then
+		local why = "Roost panel unavailable on " .. host.name .. ": " .. tostring(err)
+		if quiet then tern.log.warn(why) else report(cx, why, "Panel unavailable") end
+		return nil
+	end
 	slotPane = pane
 	rendered[pane] = tern.json.encode(data)
 	if tab then pin(cx, tab) end
@@ -674,24 +687,25 @@ end
 -- Keeps the panel in the shown tab. Runs on every tab, pane and focus event and
 -- each tick, so one disabled hook can't leave it behind.
 local function follow(cx, tab)
-	if not localHost(cx) then return end
+	if panelBlocked[cx.hosts:current().id] and not slot(cx) then return end
 	tab = tab or shownTab(cx)
 	if not tab then return end
 	local pane = slot(cx)
 	if not pane then
 		if not wantPanel then return end
-		-- Gone while its tab remains: you closed it. Gone with its tab (a closed
-		-- session or tab): bring it back here.
+		-- Gone while its tab (on this host) remains: you closed it. Gone with its tab
+		-- (a closed session or tab): bring it back here.
 		local tabStillOpen = false
+		local hereSessions = cx.hosts:current().sessions
 		for _, info in cx.session:tabs() do
-			if info.id == panelTab then tabStillOpen = true end
+			if info.id == panelTab and table.find(hereSessions, info.session) then tabStillOpen = true end
 		end
 		if tabStillOpen then
 			setWantPanel(false)
 			panelTab = nil
 			return
 		end
-		openPanel(cx, tab)
+		openPanel(cx, tab, true)
 		return
 	end
 	-- Alone in the shown tab: its last terminal just closed. Close the tab as
@@ -712,7 +726,6 @@ end
 
 -- Shows the Roost panel in the shown tab and focuses it, opening it if needed.
 local function navigator(cx)
-	if not requireLocal(cx) then return nil end
 	setWantPanel(true)
 	local tab = shownTab(cx)
 	local pane = slot(cx)
@@ -729,7 +742,6 @@ end
 
 -- The Sessions shortcut: hides the panel when it has focus, otherwise shows and focuses it.
 local function togglePanel(cx)
-	if not requireLocal(cx) then return end
 	local pane = slot(cx)
 	if pane and cx.session:focused() == pane then
 		setWantPanel(false)
@@ -847,7 +859,7 @@ local function autoName(cx)
 	local titled = records("titled")
 	local snap = Harness.snapshot(cx)
 	local cwds = sessionCwds(cx, snap)
-	local current = cx.sessions:current()
+	local localId = localHostId(cx)
 	local changed, live = false, {}
 	for _, session in cx.sessions:list() do
 		local key = tostring(session.id)
@@ -855,7 +867,7 @@ local function autoName(cx)
 		local mine = titled[key]
 		if mine and mine ~= session.name then mine = false; titled[key] = false; changed = true end
 		local cwd = cwds[key]
-		if session.host == current.host and mine ~= false and (mine or (cwd and session.name == Folders.basename(cwd))) then
+		if session.host == localId and mine ~= false and (mine or (cwd and session.name == Folders.basename(cwd))) then
 			local title = Harness.detect(cx, session.id, snap).title
 			if title and title ~= session.name then
 				local ok, err = pcall(function() cx.sessions:rename(session.id, title) end)
@@ -1082,7 +1094,6 @@ end
 
 -- Switch to any session: the picker lists each as "name — folder".
 local function findSession(cx)
-	if not requireLocal(cx) then return end
 	local items = {}
 	for _, session in allSessions(cx) do
 		table.insert(items, { label = session.name .. " — " .. session.where, current = session.current, id = session.id })
@@ -1217,7 +1228,6 @@ local function placeSession(cx, id, target)
 end
 
 tern.on("canvas_action", function(ev, cx)
-	if not requireLocal(cx) then return true end
 	local act, value = ev.act, ev.value
 	local path = Folders.unhex(value)
 	-- A pick-up from "Move": a click on a row of the same kind places it there; any other click drops the move.
@@ -1301,7 +1311,7 @@ end)
 local function tick(cx)
 	tern.timer(750, tick)
 	local ok, err = pcall(function()
-		if not localHost(cx) then return end
+		-- Any host: the panel follows you there; auto-naming stays with this Mac's sessions.
 		follow(cx)
 		seedActivity(cx)
 		autoName(cx)
