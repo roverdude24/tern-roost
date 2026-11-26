@@ -796,6 +796,35 @@ local function tabLaunch(cx, cwd)
 	return launch
 end
 
+-- A remote folder key "host:path" split into host name and path; nil for this Mac's folders.
+local function remoteFolder(key)
+	if key == Folders.OTHER or string.sub(key, 1, 1) == "/" then return nil end
+	return string.match(key, "^([^:]+):(.+)$")
+end
+
+-- Runs `fn(cx)` once host `spec` (id or name) is shown: sessions:create only reaches the shown host.
+local function onHost(cx, spec, fn)
+	local function shown(host)
+		return host.id == spec or (type(spec) == "string" and string.lower(host.name) == string.lower(spec))
+	end
+	if shown(cx.hosts:current()) then fn(cx); return end
+	if spec == nil or not pcall(function() cx.hosts:switch(spec) end) then
+		report(cx, "Connect " .. tostring(spec) .. " first.", "Host unavailable")
+		return
+	end
+	local tries = 0
+	local function attempt(nextCx)
+		if not nextCx then return end
+		if not shown(nextCx.hosts:current()) then
+			tries += 1
+			if tries < 10 then tern.timer(200, attempt) else report(nextCx, "Could not reach " .. tostring(spec) .. ".", "Host unavailable") end
+			return
+		end
+		fn(nextCx)
+	end
+	tern.timer(0, attempt)
+end
+
 -- A new session named after the folder (or `name`), its first tab there. With
 -- `command` the first tab runs it instead of a shell. Returns whether it started.
 -- `remote`: `path` lives on the shown remote host, so skip this Mac's checks.
@@ -982,31 +1011,12 @@ local function restoreSettled(cx, sid)
 	if not record then redraw(cx); return end
 	if not record.cwd then report(cx, "This session had no known folder.", "Cannot restore"); return end
 	local command = Harness.launchCommand(record.kind)
-	if record.remote then
-		-- Sessions are created on the shown host: go to the record's host first, then create once it is shown.
-		local want = string.lower(record.host or "")
-		local switched = pcall(function() cx.hosts:switch(record.host) end)
-		if not switched then report(cx, "Connect " .. tostring(record.host) .. " first.", "Cannot restore"); return end
-		local tries = 0
-		local function attempt(nextCx)
-			if not nextCx then return end
-			if string.lower(nextCx.hosts:current().name) ~= want then
-				tries += 1
-				if tries < 10 then tern.timer(200, attempt) else report(nextCx, "Could not reach " .. record.host .. ".", "Cannot restore") end
-				return
-			end
-			if newSessionIn(nextCx, record.cwd, command, record.name, true) then
-				forgetSettled(nextCx, sid)
-				nextCx:toast("info", "Session restored", notificationLabel(record.name))
-			end
+	onHost(cx, if record.remote then record.host else localHostId(cx), function(hereCx)
+		if newSessionIn(hereCx, record.cwd, command, record.name, record.remote) then
+			forgetSettled(hereCx, sid)
+			hereCx:toast("info", "Session restored", notificationLabel(record.name))
 		end
-		tern.timer(0, attempt)
-		return
-	end
-	if newSessionIn(cx, record.cwd, command, record.name) then
-		forgetSettled(cx, sid)
-		cx:toast("info", "Session restored", notificationLabel(record.name))
-	end
+	end)
 end
 
 local function pinFolder(cx, path)
@@ -1072,7 +1082,6 @@ end
 
 -- Opens macOS's folder picker and hands the chosen folder to `done(cx, path)`.
 local function chooseFolder(cx, prompt, done)
-	if not requireLocal(cx) then return end
 	if picking then
 		cx:toast("info", "Folder picker already open", "Choose a folder or cancel it.")
 		return
@@ -1128,33 +1137,85 @@ local function findSession(cx)
 		end)
 end
 
--- A new session in a pinned or in-use folder, or in one you browse to.
-local function newSession(cx)
-	if not requireLocal(cx) then return end
+-- A new session on `host`: in one of its folders, a typed path, or (this Mac) one you browse to.
+local function newSessionOn(cx, host)
+	local isLocal = host.kind == "local"
+	local label = Harness.host(cx, host.id) or host.name
 	local home = tern.getenv("HOME")
 	local items = {}
 	local _, data = allSessions(cx)
 	local function walk(group)
 		if not group.other then
-			table.insert(items, {
-				label = Folders.short(group.path, home), icon = "folder",
-				detail = if group.pinned then "pinned" else nil, group = if group.pinned then "Pinned" else "In use",
-				path = group.path,
-			})
+			local remoteHost, remotePath = remoteFolder(group.path)
+			if isLocal and not remoteHost then
+				table.insert(items, {
+					label = Folders.short(group.path, home), icon = "folder",
+					detail = if group.pinned then "pinned" else nil, group = if group.pinned then "Pinned" else "In use",
+					path = group.path,
+				})
+			elseif not isLocal and remoteHost == host.name then
+				table.insert(items, { label = remotePath, icon = "folder", group = "In use", path = remotePath })
+			end
 		end
 		for _, child in group.children do walk(child) end
 	end
 	for _, group in data.groups do walk(group) end
-	table.insert(items, { label = "Choose folder…", icon = "folder", group = "Browse", choose = true })
-	cx:pick({ items = items, placeholder = "New session in…", icon = "folder", action = "open" })
+	if isLocal then table.insert(items, { label = "Choose folder…", icon = "folder", group = "Browse", choose = true }) end
+	table.insert(items, { label = "Type a path…", icon = "folder", group = "Browse", typed = true })
+	local function create(doneCx, path)
+		onHost(doneCx, host.id, function(hereCx) newSessionIn(hereCx, path, nil, nil, not isLocal) end)
+	end
+	cx:pick({ items = items, placeholder = "New session on " .. label .. " in…", icon = "folder", action = "open" })
 		:next(function(item, _err, nextCx)
 			if not nextCx or not item then return end
 			if item.choose then
-				chooseFolder(nextCx, "Choose a folder for the new session", function(doneCx, path) newSessionIn(doneCx, path) end)
+				chooseFolder(nextCx, "Choose a folder for the new session", create)
+			elseif item.typed then
+				nextCx:prompt({ placeholder = "Folder path on " .. label, action = "open" }):next(function(answer, _e, promptCx)
+					local path = if answer then answer:match("^%s*(.-)%s*$") else ""
+					if not promptCx or path == "" then return end
+					if isLocal then
+						if string.sub(path, 1, 1) == "~" then path = (home or "") .. string.sub(path, 2) end
+						path = Folders.norm(path)
+					end
+					create(promptCx, path)
+				end)
 			else
-				newSessionIn(nextCx, item.path)
+				create(nextCx, item.path)
 			end
 		end)
+end
+
+-- A new session: asks which host first when more than one is connected.
+local function newSession(cx)
+	local items = {}
+	for _, host in cx.hosts:list() do
+		if host.kind == "local" or host.state == "connected" then
+			table.insert(items, {
+				label = Harness.host(cx, host.id) or host.name, icon = "terminal", current = host.current,
+				detail = if host.kind == "local" then "this Mac" else host.address, id = host.id,
+			})
+		end
+	end
+	if #items < 2 then newSessionOn(cx, cx.hosts:current()); return end
+	cx:pick({ items = items, placeholder = "New session on…", icon = "terminal", action = "choose" })
+		:next(function(item, _err, nextCx)
+			if not nextCx or not item then return end
+			for _, host in nextCx.hosts:list() do
+				if host.id == item.id then newSessionOn(nextCx, host); return end
+			end
+			report(nextCx, "That host disconnected.", "Host unavailable")
+		end)
+end
+
+-- A new session in a panel folder, on the host the folder lives on.
+local function openIn(cx, folder, command)
+	local host, path = remoteFolder(folder)
+	if host then
+		onHost(cx, host, function(hereCx) newSessionIn(hereCx, path, command, nil, true) end)
+	else
+		onHost(cx, localHostId(cx), function(hereCx) newSessionIn(hereCx, folder, command) end)
+	end
 end
 
 -- ── Worktrees (plain git) ───────────────────────────────────────────────
@@ -1273,8 +1334,8 @@ tern.on("canvas_action", function(ev, cx)
 	elseif act == "refresh" then refreshByHand(cx)
 	elseif act == "switch" then switchTo(cx, tonumber(value))
 	elseif act == "collapse" and path then toggleCollapse(cx, path)
-	elseif act == "folder-new" and path then newSessionIn(cx, path)
-	elseif act == "folder-omp" and path then newSessionIn(cx, path, "omp")
+	elseif act == "folder-new" and path then openIn(cx, path)
+	elseif act == "folder-omp" and path then openIn(cx, path, "omp")
 	elseif act == "reveal" and path then reveal(cx, path)
 	elseif act == "pin" and path then togglePin(cx, path)
 	elseif act == "pr" and path then cx:open(path)
@@ -1311,8 +1372,8 @@ tern.on("canvas_action", function(ev, cx)
 		or act == "Pin folder" or act == "Unpin folder" or act == "New worktree session" or act == "Remove worktree" then
 		local folder = view.folderPath(ev.node)
 		if not folder then return true end
-		if act == "New session here" then newSessionIn(cx, folder)
-		elseif act == "New omp session here" then newSessionIn(cx, folder, "omp")
+		if act == "New session here" then openIn(cx, folder)
+		elseif act == "New omp session here" then openIn(cx, folder, "omp")
 		elseif act == "Reveal in Finder" then reveal(cx, folder)
 		elseif act == "New worktree session" then newWorktreeSession(cx, folder)
 		elseif act == "Remove worktree" then removeWorktree(cx, folder)

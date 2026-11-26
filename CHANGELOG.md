@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- *New session* asks which host first when more than one is connected, then lists that host's folders plus *Type a path…* (and *Choose folder…* on this Mac), switches to the host and opens the session there.
+- Remote folders get `+`, ✦, *New session here* and *New omp session here*, opening on their own host.
+- Folder actions on this Mac work while a remote host is shown: Roost switches back first.
+
 ## 0.3.1
 
 - Remote folders are keyed by host (`vinhlam-pc:C:\…`), so the same path on two machines no longer merges into one folder.

@@ -158,9 +158,11 @@ function folderNode(group)
 		tip ..= "\n" .. facts
 	end
 	local menu
-	-- A folder on another machine: new sessions, Finder and pins only work on this Mac.
+	-- A folder on another machine: new sessions open on that host; Finder and pins only work on this Mac.
 	if group.remote and not group.other then
-		menu = { "Move" }
+		table.insert(header, iconButton("new", "plus", "folder-new=" .. hex, "New session in " .. group.path, "roost.hoverAct"))
+		table.insert(header, iconButton("omp", "sparkle", "folder-omp=" .. hex, "New session running omp in " .. group.path, "roost.hoverAct"))
+		menu = { "New session here", "New omp session here", "Move" }
 	elseif not group.other then
 		if group.pinned then
 			table.insert(header, iconButton("pin", "pin", "pin=" .. hex, "Unpin folder (it hides when it has no sessions)", "roost.pinOn"))

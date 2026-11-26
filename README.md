@@ -28,7 +28,7 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 **Order.** Right-click › *Move* on a folder or session picks it up; then click the folder or session whose place it should take (click it again to cancel). Tern panels take clicks, not drags, so this is Roost's drag and drop. Sessions move only within their folder. Your order sticks; new folders and sessions appear above it.
 
-**Hosts.** Sessions on every machine Tern is connected to (`tern remote`) are listed. A remote folder is labelled with its host (`vinhlam-pc:C:\Users\me\` **tmp**), so the same path on two machines stays two folders. Once two hosts appear, each row names its host under the session name; click a remote row to switch to it. Remote folders offer just *Move*: new sessions, Finder, pins and git marks work on this Mac. The panel follows you onto a remote host (each host keeps its own copy); if Tern cannot open it there, the shortcut says why. Auto-naming works on every host, and *Restore* of a remote settled session switches to that host and reopens it there.
+**Hosts.** Sessions on every machine Tern is connected to (`tern remote`) are listed. A remote folder is labelled with its host (`vinhlam-pc:C:\Users\me\` **tmp**), so the same path on two machines stays two folders. Once two hosts appear, each row names its host under the session name; click a remote row to switch to it. *New session* first asks which host (when more than one is connected), then offers that host's folders, *Type a path…* and, on this Mac, *Choose folder…*; Roost switches to the host and opens the session there. A remote folder's `+`, ✦ and *New session here* open on its own host too. Finder, pins and git marks work on this Mac only. The panel follows you onto a remote host (each host keeps its own copy); if Tern cannot open it there, the shortcut says why. Auto-naming works on every host, and *Restore* of a remote settled session switches to that host and reopens it there.
 
 **Names.** A session still named after its folder (the name Tern and Roost give a new one) takes the title its agent sets, minus the leading icon, so omp's `OMNI: Evaluate openomni and omniget repos` becomes the session's name, in the panel and in Tern's tab bar alike. It follows the title as the agent retitles. Rename a session yourself (in Roost or Tern) and Roost leaves that name alone.
 
@@ -40,7 +40,7 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 | Where | Action |
 | --- | --- |
-| Header icons | Find session, New session (pick a pinned or in-use folder, or browse), Add folder (pin), Refresh |
+| Header icons | Find session, New session (pick a host, then a pinned or in-use folder, a typed path, or browse), Add folder (pin), Refresh |
 | Folder (hover) | pin, `+` new session, ✦ new session running `omp`, open in Finder |
 | Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session (repositories), Remove worktree (worktrees) |
 | Session (right-click) | Rename, Move, New tab here, Lock or Unlock, Settle, Close |
