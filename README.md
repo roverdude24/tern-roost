@@ -1,136 +1,121 @@
 # Roost
 
-A Tern plugin with two parts:
+**All your Tern sessions in one panel, and all your agents' work on one board.**
 
-- **Roost panel:** a left panel listing every Tern session, grouped by working folder, on every connected host. Each row shows its agent harness, its state and how long since it was last active. Folders that are git repositories also show their branch and worktrees. A Settled shelf keeps the sessions you are done with. Any folder works; nothing needs a repository.
-- **Mission control:** a Kanban tab over an agent task board ([Vercel Board](https://vercel.com), the `vb` CLI). It shows what needs you, what is queued, running, waiting and done, for one project or all of them. Click a card to read its thread and act on it.
+You have agents running in a dozen sessions, across several projects, maybe on two machines. Roost gives you two views that keep it under control:
+
+- **The Roost panel** sits on the left and lists every session, grouped by folder. One look tells you which agent is working, which one is waiting for you, and which session you last touched.
+- **Mission control** is a Kanban board of your agents' tasks. It shows what needs your answer, what's queued, running and done. Click any card to read the thread and answer it without leaving Tern.
 
 ![Roost panel](docs/panel-0.2.5.png)
 
-![Mission control: Kanban across projects](docs/mission-control-0.4.0.png)
-
-![Mission control: a decision open in the side panel](docs/mission-panel-0.4.0.png)
-
-The Mission control screenshots use made-up projects and tasks.
-
-Forked from [mmnavarr/overseer](https://github.com/mmnavarr/overseer) (MIT, see `LICENSE`). The panel mechanics come from Overseer; the folder model, hosts and Mission control are new.
-
-## Install
-
-You need the [Tern](https://docs.stencil.so/tern/) desktop app on macOS. Git is optional. Mission control also needs Node.js and a Board checkout (see [Mission control](#mission-control)).
+## Install in one line
 
 ```sh
 /Applications/Tern.app/Contents/MacOS/tern plugin install github.com/roverdude24/tern-roost
 ```
 
-To run it from source instead, clone the repo and run `tern plugin link "$PWD"`. It reloads whenever a file changes.
+Then press **`⌘⌥⇧L`** to show the panel.
 
-Roost can be installed next to Overseer; each has its own shortcut (Overseer uses `⌘⌥⇧P`). If both panels are open, they share one left column, so show one at a time.
+You need [Tern](https://docs.stencil.so/tern/) on macOS. That's it: no git, no repository, no setup. Mission control also needs a task board (see [Mission control](#mission-control)).
 
-## Roost panel
+## The Roost panel
 
-Show or hide the panel with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or its status-line segment. The panel follows whichever tab is shown and remembers its width.
+### See every session at a glance
 
-**Folders.** A session belongs to the working directory of its first tab, or of the next tab when the first has none.
-- Each folder gets a two-letter badge in a colour fixed by its path: the first letters of its first and last words, or the first two letters of a one-word name.
-- Pinned folders always show, at the top, in the order you pinned them. The rest follow by session count, then name. Directories Roost cannot place go under *Other*.
-- A session inside a pinned folder, a repository or a worktree is listed under the deepest of those that holds it, with its subfolder shown dimmed.
-- Hover a folder header for its buttons: `+` (new session), ✦ (new omp session), Finder, and pin.
+Sessions are grouped by the folder they run in, so each project's work sits together. Each row tells you:
 
-**Rows.** Each session row shows:
-- a status dot: grey when idle, pulsing green while an agent works, blue while one waits for you
-- the session name
-- a harness icon: omp, Claude Code, Codex, Pi, Hermes, Gemini, OpenCode or Aider, else a terminal
-- time since it was last active: `now`, `12m`, `4h`, `2d`
+- **What it's doing:** a pulsing green dot while an agent works, blue when it's waiting for you, grey when idle.
+- **Which agent runs it:** omp, Claude Code, Codex, Pi, Hermes, Gemini, OpenCode or Aider, shown as an icon.
+- **When you last used it:** `now`, `12m`, `4h`, `2d`.
 
-Hover a row to see its folder, host, harness and model. Within a folder, sessions whose agent waits for you come first, then the most recently active. When the panel is narrow, the folder path and then the harness icon are hidden first, so names stay readable.
+Sessions waiting for you rise to the top of their folder. If Tern is in the background, macOS sends an alert when an agent finishes, fails or needs you.
 
-**Names.** A session still named after its folder (the default name for a new one) takes the title its agent sets, minus the leading icon. So omp's `OMNI: Evaluate repos` becomes the session's name, in the panel and in Tern's tab bar. The name follows the agent as it retitles. Rename a session yourself, in Roost or Tern, and Roost leaves your name alone.
+### Names that write themselves
 
-**Order.** Tern panels take clicks, not drags, so moving works in two clicks:
-1. Right-click a folder or session and choose *Move* to pick it up.
-2. Click the folder or session whose place it should take. Click the picked item again to cancel.
+A new session takes the title its agent gives itself. Start omp on a task and the session becomes `OMNI: Evaluate repos`, in the panel and in Tern's tab bar. Rename it yourself and Roost leaves your name alone.
 
-Sessions move only within their own folder. Your order is kept, and new folders and sessions appear above it.
+### Jump around fast
 
-**Hosts.** Roost lists sessions on every machine Tern is connected to (`tern remote`).
-- A remote folder shows its host (`vinhlam-pc:C:\Users\me\` **tmp**), so the same path on two machines stays two folders.
-- Once sessions from two hosts appear, each row names its host. Click a remote row to switch to it.
-- *New session* asks for the host first (when more than one is connected), then offers that host's folders, *Type a path…* and, on this Mac, *Choose folder…*. Roost switches to that host and opens the session there. A remote folder's `+`, ✦ and *New session here* open on its own host too.
-- The panel follows you onto a remote host; each host keeps its own copy. If Tern cannot open it there, the shortcut tells you why.
-- Finder, pins and git marks work on this Mac only. Auto-naming works on every host.
+- **`⌥J` / `⌥K`:** next or previous session.
+- **`⌥⇧1`–`⌥⇧9`:** jump straight to a session.
+- **Find session** in the header searches every session by name.
+- Hover a folder for one-click **new session**, **new omp session**, **Finder** and **pin**.
 
-**Git.** When a folder is a git repository, its header shows small marks:
-- the branch, when it is not `main` or `master`
-- an amber `●` for uncommitted changes
-- `↑`/`↓` for commits ahead of or behind its upstream
-- the pull request number, if `gh` is installed and finds one
+### Your order, your way
 
-Hover the header to read them in words. Linked worktrees appear under their repository. Folders that are not repositories show none of this.
+Pin the folders you use most, so they always stay at the top. To reorder, right-click a folder or session, choose **Move**, then click where it should go.
 
-**Settled.** The collapsed *Settled* section at the bottom keeps sessions you are done with: name, folder, harness, model, host and last activity, newest first, up to 200.
-- *Settle* in a row's menu closes the session's programs, after asking you to confirm. A session that ends any other way lands here too.
-- Idle sessions are never settled automatically.
-- `↶` (on hover, or right-click › *Restore*) reopens a session with the same folder and name, running the same harness when Roost knows it. A remote session reopens on its own host.
-- Right-click › *Forget* removes it from the list.
+### Git, when you want it
 
-**Activity.** Tern gives sessions no timestamps, so Roost records one whenever you focus a session, a command starts or finishes, an agent changes state, or a title or directory changes. Sessions older than Roost start from how long `tern inspect` says they have been quiet.
+When a folder is a git repository, Roost adds a few small marks: the branch, an amber `●` for uncommitted changes, `↑`/`↓` for commits to push or pull, and the PR number (if `gh` is installed). Worktrees appear under their repository, and you can create or remove one from the right-click menu. Folders that aren't repositories work the same as always.
 
-**Alerts.** While Tern is in the background, macOS shows an alert when an agent finishes, fails or needs your input.
+### Works across machines
+
+Connected to another computer with `tern remote`? Its sessions show up in the same panel, each labelled with its host. Click a remote session to switch to it, or start a new session on any host.
+
+### Settled: a shelf, not a trash can
+
+Done with a session? **Settle** it. It closes, and Roost remembers its folder, name and agent. Click **↶** later to bring it back exactly as it was. Sessions that end on their own land here too, so nothing gets lost.
 
 ## Mission control
 
-Open Mission control with the list icon in the Roost header or the palette command *Roost: Show or hide Mission control*. It opens as a tab. The same icon, lit while the tab is open, closes it again, as does the ✕ in the tab.
+![Mission control: every project's tasks on one board](docs/mission-control-0.4.0.png)
 
-**Board.** Five columns, each with a count:
+Your agents post tasks to a board ([Vercel Board](https://vercel.com), the `vb` CLI). Mission control turns that board into a Kanban inside Tern. Open it with the list icon in the Roost header.
 
-| Column | Holds |
+### What needs you comes first
+
+| Column | What's in it |
 | --- | --- |
-| Needs you | decisions waiting for an answer, blocked and failed tasks |
-| Todo | tasks ready to be picked up |
-| Working | tasks an agent has claimed |
-| Waiting | tasks waiting on another task |
-| Done | the latest finished tasks, newest first (12 shown) |
+| 🔴 **Needs you** | decisions waiting for your answer, blocked and failed tasks |
+| 🟡 **Todo** | ready to be picked up |
+| 🟡 **Working** | an agent is on it |
+| 🟡 **Waiting** | waiting on another task |
+| 🟢 **Done** | the latest finished work |
 
-Each card shows its state as a coloured pill (red for Failed and Blocked, yellow for Waiting, In progress and Todo, green for Ready and Done) and its kind and lane in a cyan pill. A goal also shows the lead's latest note. Cards that need attention have a red or yellow edge.
+Each card has a coloured status pill, so you can scan the whole board in seconds.
 
-**Projects.** A row of project chips sits above the board. Each chip shows the project's open tasks and how many need you, with the projects that most need you first.
-- *All* shows every project. Each card then carries a coloured tag with its project's name.
-- Clicking a project chip shows only that project. Mission control remembers the choice, and reading one project is faster than reading all.
+### One project or all of them
 
-**Card panel.** Click a card to open its panel beside the board. The panel shows the task's whole thread, oldest message first, with author and time. Its actions:
+Chips above the board list your projects, the busiest first, each with its count of open tasks and tasks that need you. Click **All** to see everything at once, with every card tagged by project. Click one project to focus on it. The board scales from one project to dozens.
 
-| Action | When | What it does |
-| --- | --- | --- |
-| *Reply…* | always | writes a reply in the thread |
-| A / B answers | a decision lists options | replies with that option |
-| *Unblock* | blocked | lifts the hold, so the task is ready again |
-| *Reopen* | failed | makes the task ready again |
-| *Cancel…* | not finished | cancels the task, after asking for a reason |
-| *As note* | always | opens the thread as a Tern note |
+### Answer without switching apps
 
-Click the card again or the panel's ✕ to close it.
+![Mission control: answering a decision from the side panel](docs/mission-panel-0.4.0.png)
 
-**New goal.** *New goal* asks for a project (the one on show is offered first) and the goal text, then posts the goal to that project's `<project>/build` channel. The Board's lead agent splits it into tasks.
+Click a card and a panel opens beside the board with the full conversation. From there you can:
 
-**Refresh.** The tab refreshes every 30 seconds while it is open, and the header shows the time of the last refresh. The refresh button does it right away.
+- **Reply**, or answer a decision with one click (**A** / **B**)
+- **Unblock** a stuck task, or **Reopen** a failed one
+- **Cancel** a task (Roost asks for a reason first)
+- Open the thread as a note
 
-**Setup.** Mission control runs the Board CLI through Node.js (`/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`). It expects a Board checkout at `~/Developer/vinhlam-board` with `npm install` done, linked to your board. If yours lives elsewhere, use *Choose Board folder*, shown when Mission control cannot find it. Projects are the Board's `<name>/build` channels; decisions live in `<name>/decisions`.
+**New goal** sends a goal to a project. Your lead agent breaks it into tasks, and they appear on the board.
 
-## Reference
+The board refreshes every 30 seconds by itself, and the header shows when it last did.
 
-| Where | Action |
+*Screenshots use made-up projects and tasks.*
+
+### Setup
+
+Mission control needs Node.js and a Board checkout at `~/Developer/vinhlam-board` with `npm install` done, linked to your board. If your checkout lives somewhere else, Mission control asks you to choose the folder. Each project is a `<name>/build` channel on the board; decisions go in `<name>/decisions`.
+
+## Cheat sheet
+
+| Where | What you can do |
 | --- | --- |
-| Header icons | Mission control, Find session, New session, Add folder (pin), Refresh |
-| Folder (hover) | pin, `+` new session, ✦ new omp session, open in Finder |
-| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session (repositories), Remove worktree (worktrees) |
+| Keys | `⌘⌥⇧L` show or hide the panel, `⌥J` / `⌥K` next / previous session, `⌥⇧1`–`⌥⇧9` session 1–9 |
+| Header | Mission control, Find session, New session, Add folder, Refresh |
+| Folder (hover) | pin, `+` new session, ✦ new omp session, Finder |
+| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session, Remove worktree |
 | Session (right-click) | Rename, Move, New tab here, Lock or Unlock, Settle, Close |
-| Settled row (right-click) | Restore, Forget |
-| Palette | Show or hide Roost, Roost: Find session, Roost: New session in folder, Roost: Rename current session, Roost: Show or hide Mission control, Roost: Next / Previous session, Roost: Session 1–9 |
-| Keys | `⌘⌥⇧L` show or hide, `⌥J` / `⌥K` next / previous session, `⌥⇧1`–`⌥⇧9` session 1–9 (panel order) |
+| Settled (right-click) | Restore, Forget |
+| Palette | type *Roost* for show or hide, Find, New session in folder, Rename, Mission control, Next / Previous, Session 1–9 |
 
-*New worktree session* asks for a branch name, runs `git worktree add` into a sibling folder (`<repo>-<branch>`) and opens a session there. *Remove worktree* refuses while the worktree has uncommitted changes or a session is open in it. It always keeps the branch.
+## Good to know
 
-New tabs follow Settings › New tabs and splits open (shell or agent), like ⌘T.
-
-Roost keeps everything in the plugin's own key-value store: pinned folders, collapsed folders, your order, panel width, activity times, Settled, and Mission control's Board folder and project filter.
+- **Overseer:** Roost installs next to [Overseer](https://github.com/mmnavarr/overseer), but the two panels share one left column, so show one at a time.
+- **Run from source:** clone the repo and run `tern plugin link "$PWD"`. Roost reloads whenever you save a file.
+- **Your data stays local:** pins, order, panel width, activity times and Settled are kept in Tern's plugin store on your Mac.
+- **Credits:** forked from [mmnavarr/overseer](https://github.com/mmnavarr/overseer) (MIT, see `LICENSE`). The panel mechanics come from Overseer; folders, hosts, Settled and Mission control are new.
