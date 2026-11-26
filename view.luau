@@ -264,6 +264,7 @@ function View.render(model)
 				text("title", "Roost", "roost.heading"),
 				text("total", tostring(model.total), "roost.count"),
 			}),
+			iconButton("mission", "list-checks", "mission", "Mission control"),
 			iconButton("find", "search", "find", "Find session"),
 			iconButton("new", "plus", "new", "New session"),
 			iconButton("add", "folder-plus", "add", "Add folder"),

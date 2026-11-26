@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Mission control tab over the VinhLam Board (`vb`): Now (decisions waiting, A/B answers), goals and tasks per project with state and lane, New goal (posted to `<project>/build` for the lead to plan), Open thread as a note, 30 s refresh.
+
 - Keys: `⌥J` / `⌥K` step to the next / previous session in panel order (wrapping), `⌥⇧1`–`⌥⇧9` jump to session 1–9.
 - A session whose agent waits for you sits at the top of its folder.
 - macOS alert when an agent finishes, fails or needs your input, only while Tern is in the background.

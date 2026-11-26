@@ -4,6 +4,7 @@ local Git = require("./git")
 local Harness = require("./harness")
 local Badge = require("./badge")
 local view = require("./view")
+local Mission = require("./mission")
 
 local rendered = {}
 local problem
@@ -1284,6 +1285,8 @@ local function removeWorktree(cx, path)
 end
 
 tern.command({ id = "toggle", title = "Show or hide Roost", icon = "folder", keys = { "cmd+alt+shift+l" }, run = togglePanel })
+Mission.setup({ report = report, chooseFolder = chooseFolder })
+tern.command({ id = "mission", title = "Roost: Mission control", icon = "list-checks", run = Mission.open })
 tern.command({ id = "find", title = "Roost: Find session", icon = "search", run = findSession })
 tern.command({ id = "new", title = "Roost: New session in folder", icon = "folder-plus", run = newSession })
 tern.command({ id = "rename", title = "Roost: Rename current session", icon = "rename", run = function(cx)
@@ -1333,6 +1336,7 @@ local function placeSession(cx, id, target)
 end
 
 tern.on("canvas_action", function(ev, cx)
+	if ev.title == Mission.TITLE then return Mission.action(ev, cx) end
 	local act, value = ev.act, ev.value
 	local path = Folders.unhex(value)
 	-- A pick-up from "Move": a click on a row of the same kind places it there; any other click drops the move.
@@ -1350,6 +1354,7 @@ tern.on("canvas_action", function(ev, cx)
 	end
 	if act == "find" then findSession(cx)
 	elseif act == "new" then newSession(cx)
+	elseif act == "mission" then Mission.open(cx)
 	elseif act == "add" then
 		chooseFolder(cx, "Choose a folder to pin in Roost", pinFolder)
 	elseif act == "refresh" then refreshByHand(cx)
@@ -1420,6 +1425,7 @@ local function tick(cx)
 		follow(cx)
 		seedActivity(cx)
 		autoName(cx)
+		Mission.tick(cx)
 		if slot(cx) then
 			if drawnPaths then refreshGit(cx, drawnPaths) end
 			if drawnLive then saveActivity(cx, drawnLive) end

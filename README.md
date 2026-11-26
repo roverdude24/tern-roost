@@ -32,6 +32,8 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 **Names.** A session still named after its folder (the name Tern and Roost give a new one) takes the title its agent sets, minus the leading icon, so omp's `OMNI: Evaluate openomni and omniget repos` becomes the session's name, in the panel and in Tern's tab bar alike. It follows the title as the agent retitles. Rename a session yourself (in Roost or Tern) and Roost leaves that name alone.
 
+**Mission control.** The list icon in the header (or palette *Roost: Mission control*) opens a tab over your VinhLam Board: *Now* (decisions and tasks waiting for you, with A/B buttons that reply in the thread, or *Answer…*), then each project's goals and tasks with their state and lane. *New goal* picks a project and posts the goal to its build channel, where the Board's lead splits it into tasks. *Open* shows a whole thread as a note. It refreshes every 30 s while open. Needs the Board checkout at `~/Developer/vinhlam-board` with `npm install` done (*Choose Board folder* if it lives elsewhere) and Node.js.
+
 **Agents.** A session whose agent waits for your input sits at the top of its folder. While Tern is in the background, macOS shows an alert when an agent finishes, fails or needs your input.
 
 **Activity.** Tern gives no timestamps, so Roost stamps a session whenever a command starts or finishes, an agent changes state, a title or directory changes, or you focus it. Sessions that predate Roost start from how long `tern inspect` says they have been quiet. Stamps are saved in the plugin's store.
@@ -42,11 +44,11 @@ Show or hide with `⌘⌥⇧L`, the palette command *Show or hide Roost*, or the
 
 | Where | Action |
 | --- | --- |
-| Header icons | Find session, New session (pick a host, then a pinned or in-use folder, a typed path, or browse), Add folder (pin), Refresh |
+| Header icons | Mission control, Find session, New session (pick a host, then a pinned or in-use folder, a typed path, or browse), Add folder (pin), Refresh |
 | Folder (hover) | pin, `+` new session, ✦ new session running `omp`, open in Finder |
 | Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session (repositories), Remove worktree (worktrees) |
 | Session (right-click) | Rename, Move, New tab here, Lock or Unlock, Settle, Close |
-| Palette | Show or hide Roost, Roost: Find session, Roost: New session in folder, Roost: Rename current session, Roost: Next / Previous session, Roost: Session 1–9 |
+| Palette | Show or hide Roost, Roost: Find session, Roost: New session in folder, Roost: Rename current session, Roost: Mission control, Roost: Next / Previous session, Roost: Session 1–9 |
 | Keys | `⌘⌥⇧L` show or hide, `⌥J` / `⌥K` next / previous session, `⌥⇧1`–`⌥⇧9` session 1–9 (panel order) |
 
 *New worktree session* asks for a branch name, runs `git worktree add` into a sibling folder (`<repo>-<branch>`) and opens a session there. *Remove worktree* refuses while the worktree has uncommitted changes or a session is open in it, and always keeps the branch.
