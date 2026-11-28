@@ -1028,6 +1028,12 @@ local function forgetSettled(cx, sid)
 	redraw(cx)
 end
 
+-- Where a settled session's transcripts live: nil for this Mac, else its host over ssh.
+local function transcriptHost(record)
+	if not record.remote then return nil end
+	return { host = record.host, windows = string.find(record.cwd or "", "^%a:[\\/]") ~= nil }
+end
+
 -- Reopens a settled session where it was, running its harness when known; an omp
 -- session reopens its saved conversation (found by its title, else its name).
 local function restoreSettled(cx, sid)
@@ -1042,10 +1048,11 @@ local function restoreSettled(cx, sid)
 			end
 		end)
 	end
-	if record.kind ~= "omp" or record.remote then launch(cx, Harness.launchCommand(record.kind)); return end
-	Transcript.find(record.title or record.name, function(path, nextCx)
+	if record.kind ~= "omp" then launch(cx, Harness.launchCommand(record.kind)); return end
+	local remote = transcriptHost(record)
+	Transcript.find(record.title or record.name, remote, function(path, nextCx)
 		if not nextCx then return end
-		launch(nextCx, if path then Transcript.restoreCommand(path) else "omp")
+		launch(nextCx, if path then Transcript.restoreCommand(path, remote) else "omp")
 	end)
 end
 
@@ -1053,15 +1060,19 @@ end
 local function viewSettled(cx, sid)
 	local record = findSettled(sid)
 	if not record then redraw(cx); return end
-	if record.kind ~= "omp" or record.remote then
-		report(cx, "Only this Mac's omp conversations can be viewed.", "Nothing to show")
+	if record.kind ~= "omp" then
+		report(cx, "Only omp conversations can be viewed.", "Nothing to show")
 		return
 	end
-	Transcript.find(record.title or record.name, function(path, nextCx)
+	local remote = transcriptHost(record)
+	Transcript.find(record.title or record.name, remote, function(path, nextCx)
 		if not nextCx then return end
-		if not path then report(nextCx, "No saved conversation found for it.", "Nothing to show"); return end
+		if not path then
+			report(nextCx, if remote then "No saved conversation found (ssh " .. remote.host .. ")." else "No saved conversation found for it.", "Nothing to show")
+			return
+		end
 		local out = tern.plugin.data .. "/settled-view.md"
-		Transcript.markdown(path, out, record.name, function(err, doneCx)
+		Transcript.markdown(path, remote, out, record.name, function(err, doneCx)
 			if not doneCx then return end
 			if err then report(doneCx, err, "Conversation not shown"); return end
 			local ok, openErr = pcall(function() doneCx.docs:open(out, { how = "beside" }) end)
