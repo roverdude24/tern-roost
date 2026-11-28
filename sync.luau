@@ -74,6 +74,8 @@ function Sync.exchange(ssh, host, windows, localText, done)
 	tern.process.run(readArgv, { timeout_ms = 20000 }, function(result, cx)
 		if result.status ~= 0 then done(nil, "ssh " .. host .. ": " .. (result.stderr or ""), cx) return end
 		local mine, theirs = localText and Sync.decode(localText), Sync.decode(result.stdout or "")
+		-- An unreadable remote file is never overwritten: it may hold edits made there.
+		if not theirs and string.find(result.stdout or "", "%S") then done(nil, "unreadable projects file on " .. host, cx) return end
 		if theirs and (not mine or theirs.updated > mine.updated) then done(result.stdout, nil, cx) return end
 		if not mine or (theirs and theirs.updated == mine.updated) then done(nil, nil, cx) return end
 		local writeArgv = table.clone(base)
