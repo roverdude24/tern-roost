@@ -12,6 +12,10 @@ function View.folderPath(node)
 	return Folders.unhex(type(node) == "string" and node:match("%.f(%x+)%.header$") or nil)
 end
 
+function View.projectName(node)
+	return Folders.unhex(type(node) == "string" and node:match("%.p(%x+)%.header$") or nil)
+end
+
 function View.settledId(node)
 	return type(node) == "string" and node:match("%.z(%d+)%.row$") or nil
 end
@@ -182,10 +186,17 @@ function folderNode(group)
 			if group.git then table.insert(menu, "New worktree session") end
 		end
 	end
+	-- Projects hold whole folders on any host; a worktree goes with its repository.
+	if menu and not group.worktree then
+		table.insert(menu, "Add to project…")
+		if group.inProject then table.insert(menu, "Remove from project") end
+	end
 	table.insert(header, text("age", group.age, "roost.age"))
+	local idle = group.inProject and #group.sessions == 0 and #(group.children or {}) == 0
 	local children = {
 		ui.node("row", {
-			key = "header", role = "roost.folderHeader", actions = if menu then { menu = menu } else nil,
+			key = "header", role = if idle then "roost.folderIdle" else "roost.folderHeader",
+			actions = if menu then { menu = menu } else nil,
 			title = tip, mark = if group.moving then "moving" else nil,
 		}, header),
 	}
@@ -196,7 +207,7 @@ function folderNode(group)
 		for _, child in ipairs(group.children or {}) do
 			table.insert(children, folderNode(child))
 		end
-		if #group.sessions == 0 and #(group.children or {}) == 0 then
+		if #group.sessions == 0 and #(group.children or {}) == 0 and not group.inProject then
 			table.insert(children, text("empty", "No sessions here · + opens one", "roost.hint"))
 		end
 	end
@@ -205,24 +216,70 @@ function folderNode(group)
 	}, children)
 end
 
+-- A project: its folders on any host under one header with live and waiting counts and, when a
+-- Board project shares its name, that project's open work (click: Mission control filtered to it).
+local function projectNode(project)
+	local hex = Folders.hex(project.name)
+	local toggleTitle = (if project.collapsed then "Expand " else "Collapse ") .. project.name
+	local header = {
+		ui.el("button", {
+			key = "toggle", role = "roost.folderToggle", title = toggleTitle, aria = toggleTitle,
+			actions = { click = "project-toggle=" .. hex },
+		}, {
+			text("caret", if project.collapsed then "▸" else "▾", "roost.caret"),
+			text("name", project.name, "roost.projectName"),
+			text("count", tostring(project.total), "roost.count", { title = plural(project.total, "live session") }),
+		}),
+		ui.el("div", { key = "spacer", grow = 1 }),
+	}
+	if project.waiting > 0 then
+		table.insert(header, text("waiting", project.waiting .. " waiting", "roost.projectWaiting",
+			{ title = plural(project.waiting, "agent") .. " waiting for you" }))
+	end
+	local board = project.board
+	if board and (board.you > 0 or board.open > 0) then
+		local label = if board.you > 0 then board.you .. " need you" else board.open .. " open"
+		table.insert(header, ui.button(label, {
+			key = "board", size = "sm", variant = "quiet",
+			role = if board.you > 0 then "roost.projectNeed" else "roost.iconButton",
+			title = "Board " .. board.name .. ": " .. plural(board.open, "open task") .. ", " .. board.you .. " need you",
+			actions = { click = "project-board=" .. Folders.hex(board.name) },
+		}))
+	end
+	table.insert(header, iconButton("new", "plus", "project-new=" .. hex, "New session in " .. project.name, "roost.hoverAct"))
+	local children = {
+		ui.node("row", {
+			key = "header", role = "roost.projectHeader",
+			actions = { menu = { "New session in…", "Rename project", "Move", "Delete project" } },
+			title = project.name, mark = if project.moving then "moving" else nil,
+		}, header),
+	}
+	if not project.collapsed then
+		for _, group in ipairs(project.folders) do table.insert(children, folderNode(group)) end
+		if #project.folders == 0 then
+			table.insert(children, text("empty", "No folders · right-click a folder › Add to project…", "roost.hint"))
+		end
+	end
+	return ui.node("col", { key = "p" .. hex, role = "roost.project" }, children)
+end
+
 local function settledNode(row)
 	local tip = table.concat({
 		row.name, "Folder: " .. row.where, "Host: " .. row.host,
 		"Harness: " .. row.harness .. (if row.model then " · " .. row.model else ""),
 		"Last active " .. (if row.age == "now" then "now" else row.age .. " ago"),
 	}, "\n")
+	local head = { badge("badge", row.badge, row.role), text("name", row.name, "roost.settledName") }
+	if row.project then table.insert(head, text("project", row.project, "roost.sub", { title = "Project " .. row.project })) end
+	table.insert(head, ui.el("div", { key = "spacer", grow = 1 }))
+	table.insert(head, text("age", row.age, "roost.age"))
+	table.insert(head, iconButton("restore", "undo", "restore=" .. row.sid, "Restore " .. row.name, "roost.restore"))
 	return ui.node("col", { key = "z" .. row.sid, role = "roost.settledRow" }, {
 		ui.node("row", {
 			key = "row", role = "roost.settledHead", title = tip .. "\nClick to read its conversation",
 			aria = row.name .. ", settled " .. row.age .. " ago",
 			actions = { click = "view=" .. row.sid, menu = { "View", "Restore", "Forget" } },
-		}, {
-			badge("badge", row.badge, row.role),
-			text("name", row.name, "roost.settledName"),
-			ui.el("div", { key = "spacer", grow = 1 }),
-			text("age", row.age, "roost.age"),
-			iconButton("restore", "undo", "restore=" .. row.sid, "Restore " .. row.name, "roost.restore"),
-		}),
+		}, head),
 	})
 end
 
@@ -278,8 +335,11 @@ function View.render(model)
 		table.insert(children, text("moving", "Moving " .. model.moving
 			.. " · click where it goes, or it again to stay", "roost.movingHint"))
 	end
+	for _, project in ipairs(model.projects) do
+		table.insert(children, projectNode(project))
+	end
 	for _, group in ipairs(model.groups) do
-		table.insert(children, folderNode(group))
+		if not group.inProject then table.insert(children, folderNode(group)) end
 	end
 	return ui.node("col", { key = "roost", role = "roost.panel" }, children)
 end

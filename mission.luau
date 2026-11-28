@@ -344,6 +344,7 @@ function Mission.refresh(cx)
 		pending -= 1
 		if pending > 0 then return end
 		data.loading, data.at = false, tern.now()
+		if hooks.changed then hooks.changed() end
 		local ok, stamp = pcall(os.date, "%H:%M")
 		if ok then data.updated = stamp end
 		pcall(draw, lastCx)
@@ -400,9 +401,35 @@ function Mission.toggle(cx)
 	if found then cx.layout:close(found) else Mission.open(cx) end
 end
 
--- Called from Roost's tick: refreshes an open tab every REFRESH_MS.
-function Mission.tick(cx)
-	if not data.loading and tern.now() - data.at > REFRESH_MS and pane(cx) then Mission.refresh(cx) end
+-- Open and needing-you task counts per Board project from the last read, keyed by lower-case name
+-- ({ name, open, you }); Roost's project headers show them.
+local countsOf, countsCache = nil, {}
+function Mission.counts()
+	if data.tasks ~= countsOf then
+		countsOf, countsCache = data.tasks, {}
+		for _, project in Mission.model(data.tasks, nil, nil, nil).projects do
+			countsCache[string.lower(project.name)] = project
+		end
+	end
+	return countsCache
+end
+
+-- Called from Roost's tick: refreshes an open tab every REFRESH_MS. With the tab closed and
+-- `wantCounts` (Roost has projects), reads open tasks alone, half as often, for those counts.
+function Mission.tick(cx, wantCounts)
+	if data.loading then return end
+	if pane(cx) then
+		if tern.now() - data.at > REFRESH_MS then Mission.refresh(cx) end
+	elseif wantCounts and tern.now() - (data.polled or 0) > REFRESH_MS * 2 then
+		data.polled = tern.now()
+		vb({ "tasks", "--json", "-n", "200" }, nil, function(out)
+			local decoded = decode(out)
+			if decoded then
+				data.tasks = decoded.tasks or {}
+				if hooks.changed then hooks.changed() end
+			end
+		end)
+	end
 end
 
 local function reply(cx, id, answer)

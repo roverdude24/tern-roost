@@ -35,6 +35,8 @@
   margin-left: 12px;
 }
 [data-role='roost.folderHeader'],
+[data-role='roost.folderIdle'],
+[data-role='roost.projectHeader'],
 [data-role='roost.settledHeader'] {
   align-items: center;
   gap: 4px;
@@ -123,7 +125,8 @@
 }
 /* Picked up with "Move": the next click places it. */
 [data-role='roost.session'][data-mark='moving'],
-[data-role='roost.folderHeader'][data-mark='moving'] {
+[data-role='roost.folderHeader'][data-mark='moving'],
+[data-role='roost.projectHeader'][data-mark='moving'] {
   border: 1px dashed var(--accent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -226,9 +229,40 @@
 }
 [data-role='roost.folderHeader']:hover [data-role='roost.hoverAct'],
 [data-role='roost.folderHeader']:focus-within [data-role='roost.hoverAct'],
+[data-role='roost.folderIdle']:hover [data-role='roost.hoverAct'],
+[data-role='roost.folderIdle']:focus-within [data-role='roost.hoverAct'],
+[data-role='roost.projectHeader']:hover [data-role='roost.hoverAct'],
+[data-role='roost.projectHeader']:focus-within [data-role='roost.hoverAct'],
 [data-role='roost.settledHead']:hover [data-role='roost.restore'],
 [data-role='roost.settledHead']:focus-within [data-role='roost.restore'] {
   display: flex;
+}
+/* Project: a named group of folders on any host; its folders sit indented under its header. */
+[data-role='roost.project'] {
+  gap: 2px;
+  padding: 4px 0 6px;
+  border-top: 1px solid color-mix(in srgb, var(--t4) 25%, transparent);
+}
+[data-role='roost.project'] > [data-role='roost.folder'] {
+  margin-left: 10px;
+}
+[data-role='roost.projectName'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+[data-role='roost.projectWaiting'],
+[data-role='roost.projectNeed'] {
+  flex-shrink: 0;
+  font-size: 0.8em;
+  color: light-dark(#0969da, #4493f8);
+}
+/* A project folder with no live session stays listed, dimmed. */
+[data-role='roost.folderIdle'] {
+  opacity: 0.55;
 }
 /* Git marks in the folder header: non-default branch, dirty dot, ahead/behind, pull request. */
 [data-role='roost.gitBranch'] {

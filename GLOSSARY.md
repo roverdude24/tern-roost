@@ -1,11 +1,12 @@
 # Glossary
 
-**Session**: a Tern session; Roost lists every one, grouped by folder.
+**Project**: a named body of work holding folders from any host; a folder belongs to at most one. Its sessions are the sessions of its folders. When its name matches a Board project, it is that Board project.
+**Session**: a Tern session; Roost lists every one, grouped by project, then folder.
 **Folder**: the working directory a session belongs to; a remote one is named `host:path`.
 **Host**: a machine Tern is connected to; this Mac is the local host.
 **Settled**: a session you set aside or that closed, kept so it can be restored.
 **Board**: the VinhLam Board, the only queue of agent work.
-**Goal**: a request you post to a project; the Board calls it an epic.
+**Goal**: a request you post to a Board project; the Board calls it an epic.
 **Task**: one unit of Board work for a worker or a reviewer.
 **Lead**: the Board's coordinator agent; it splits a goal into tasks and asks you decisions.
 **Decision**: a question the lead puts to you; it waits until you answer.

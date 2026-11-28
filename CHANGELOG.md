@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Projects: a named group of folders from any host (several repositories, a drive folder, the matching folder on another machine). Right-click a folder › *Add to project…* / *Remove from project*; palette *Roost: New project*. A folder is in at most one project; sessions follow their folder, and the deepest folder added wins, on remote hosts too (kv `projects`).
+- Projects sit above loose folders and stay listed when empty (idle folders dimmed). Header: live sessions, agents waiting, and, when a Board project has the same name, its open or need-you count (click: Mission control filtered to it). Right-click: *New session in…* (this Mac's folders), *Rename project*, *Move*, *Delete project* (ungroups only). Settled rows show their project.
 - Fixed sessions jumping into the wrong folder (often `/tmp`) and piling up there: Tern reports the running program's directory, and agents such as omp `cd` the whole process. A session now keeps the folder it was first seen in and moves only when its shell is at the prompt in another folder (kv `homes`).
 - Restoring a settled omp session reopens its conversation (`omp --restore` on its saved transcript, found by the session's agent title, else its name) instead of a blank omp.
 - Click a settled session to read its conversation beside the panel without restoring it (also right-click › View). Needs `jq`.

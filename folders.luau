@@ -41,10 +41,12 @@ function Folders.short(path, home)
 	return path
 end
 
--- Whether `path` is `folder` or inside it.
+-- Whether `path` is `folder` or inside it; remote Windows paths separate with "\".
 function Folders.within(path, folder)
-	local prefix = if string.sub(folder, -1) == "/" then folder else folder .. "/"
-	return path == folder or string.sub(path, 1, #prefix) == prefix
+	if path == folder then return true end
+	if string.sub(path, 1, #folder) ~= folder then return false end
+	local last, after = string.sub(folder, -1), string.sub(path, #folder + 1, #folder + 1)
+	return last == "/" or last == "\\" or after == "/" or after == "\\"
 end
 
 -- The deepest of `owners` that holds `path`, else `path` itself.
@@ -114,6 +116,8 @@ assert(Folders.basename("C:\\Users\\lamvi\\tmp") == "tmp" and select(2, Folders.
 assert(Folders.within("/p/a", "/p") and not Folders.within("/pa", "/p") and Folders.within("/x", "/"))
 assert(Folders.owner("/p/a/b", { "/p/a", "/p", "/q" }) == "/p/a" and Folders.owner("/x", { "/p" }) == "/x")
 assert(Folders.owner("/p", { "/", "/p" }) == "/p")
+assert(Folders.within("C:\\U\\x\\y", "C:\\U\\x") and not Folders.within("C:\\U\\xy", "C:\\U\\x"))
+assert(Folders.owner("C:\\U\\dev\\home\\src", { "C:\\U\\dev", "C:\\U\\dev\\home" }) == "C:\\U\\dev\\home")
 assert(Folders.relative("/p/a/b", "/p") == "a/b" and Folders.relative("/a", "/") == "a")
 assert(Folders.unhex(Folders.hex("/tmp/sf-test dir/it's here")) == "/tmp/sf-test dir/it's here")
 assert(Folders.unhex("zz") == nil and Folders.unhex("abc") == nil)

@@ -46,6 +46,12 @@ A new session takes the title its agent gives itself. Start omp on a task and th
 
 Pin the folders you use most, so they always stay at the top. To reorder, right-click a folder or session, choose **Move**, then click where it should go.
 
+### Projects: one body of work, many folders and machines
+
+A project groups folders that belong together: several repositories, a drive folder and its matching folder on another computer. Right-click any folder, on any host, and choose **Add to project…** (or **New project…** from there). Its sessions follow it, including sessions in subfolders: the deepest folder you added wins, so `~/Developer` can be one project while `~/Developer/my-app` belongs to another.
+
+Projects sit above your other folders and stay listed even when nothing runs in them; a folder with no live session is dimmed. The header shows how many sessions are live and how many agents wait for you. If the project has the same name as a VinhLam Board project, it also shows that project's open work; click it to open Mission control filtered to it. Hover the header for `+` (a new session in one of its folders on this Mac). Right-click it to rename, move or delete it; deleting only ungroups its folders.
+
 ### Git, when you want it
 
 When a folder is a git repository, Roost adds a few small marks: the branch, an amber `●` for uncommitted changes, `↑`/`↓` for commits to push or pull, and the PR number (if `gh` is installed). Worktrees appear under their repository, and you can create or remove one from the right-click menu. Folders that aren't repositories work the same as always.
@@ -108,14 +114,15 @@ Mission control needs Node.js and a Board checkout at `~/Developer/vinhlam-board
 | Keys | `⌘⌥⇧L` show or hide the panel, `⌥J` / `⌥K` next / previous session, `⌥⇧1`–`⌥⇧9` session 1–9 |
 | Header | Mission control, Find session, New session, Add folder, Refresh |
 | Folder (hover) | pin, `+` new session, ✦ new omp session, Finder |
-| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session, Remove worktree |
+| Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session, Remove worktree, Add to project…, Remove from project |
+| Project (right-click) | New session in…, Rename project, Move, Delete project |
 | Session (right-click) | Rename, Move, New tab here, Lock or Unlock, Settle, Close |
 | Settled (right-click) | View, Restore, Forget |
-| Palette | type *Roost* for show or hide, Find, New session in folder, Rename, Mission control, Next / Previous, Session 1–9 |
+| Palette | type *Roost* for show or hide, Find, New session in folder, New project, Rename, Mission control, Next / Previous, Session 1–9 |
 
 ## Good to know
 
 - **Overseer:** Roost installs next to [Overseer](https://github.com/mmnavarr/overseer), but the two panels share one left column, so show one at a time.
 - **Run from source:** clone the repo and run `tern plugin link "$PWD"`. Roost reloads whenever you save a file.
-- **Your data stays local:** pins, order, panel width, activity times and Settled are kept in Tern's plugin store on your Mac.
+- **Your data stays local:** pins, projects, order, panel width, activity times and Settled are kept in Tern's plugin store on your Mac.
 - **Credits:** forked from [mmnavarr/overseer](https://github.com/mmnavarr/overseer) (MIT, see `LICENSE`). The panel mechanics come from Overseer; folders, hosts, Settled and Mission control are new.

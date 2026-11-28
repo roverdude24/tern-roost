@@ -273,6 +273,27 @@ local function badgeOf(path)
 	return Badge.initials(Folders.basename(path)), Badge.role(path)
 end
 
+-- ── Projects ────────────────────────────────────────────────────────────
+-- kv "projects": { name, folders = { folder key, ... } } in panel order. A folder key is a path
+-- on this Mac or "host:path" on another host, and sits in at most one project.
+local function projectList()
+	return records("projects")
+end
+
+local function projectOf(list, key)
+	for index, project in list do
+		if table.find(project.folders, key) then return project, index end
+	end
+	return nil
+end
+
+local function projectNamed(list, name)
+	for index, project in list do
+		if string.lower(project.name) == string.lower(name) then return project, index end
+	end
+	return nil
+end
+
 -- Folders → sessions. Pinned folders come first, in the order pinned, and stay
 -- even when empty; a session lives under the deepest pinned folder (or known
 -- repository root or worktree) holding its directory, else under its own
@@ -296,6 +317,19 @@ local function model(cx)
 		if norm ~= "" and not table.find(pinned, norm) then table.insert(pinned, norm) end
 	end
 	local owners = table.clone(pinned)
+	-- Project folders own the sessions below them; remote ones per host name, as plain paths.
+	local remoteOwners, projects = {}, projectList()
+	for _, project in projects do
+		for _, key in project.folders do
+			local host, path = string.match(key, "^([^/][^:]*):(.+)$")
+			if host then
+				remoteOwners[host] = remoteOwners[host] or {}
+				table.insert(remoteOwners[host], path)
+			else
+				table.insert(owners, key)
+			end
+		end
+	end
 	for _, info in gitCache do
 		if info then
 			if info.root then table.insert(owners, Folders.norm(info.root)) end
@@ -323,6 +357,13 @@ local function model(cx)
 		return entry
 	end
 	for _, path in pinned do group(path) end
+	-- Project folders stay listed with no sessions; a remote one is on its host even before it has any.
+	for _, project in projects do
+		for _, key in project.folders do
+			local entry = group(key)
+			if string.sub(key, 1, 1) ~= "/" and entry.remote == nil then entry.remote = true end
+		end
+	end
 	local total = 0
 	local live = {}
 	-- Every attached host's sessions; a remote one carries its host name, shown on the row once two hosts appear.
@@ -340,11 +381,12 @@ local function model(cx)
 			hostCount += 1
 		end
 		-- A remote folder is keyed "host:path", so the same path on two machines stays two folders;
-		-- pins and repositories are this Mac's, so remote sessions group by their own directory.
-		local folder = if not cwd then Folders.OTHER elseif remote then hostName .. ":" .. cwd else Folders.owner(cwd, owners)
+		-- pins and repositories are this Mac's, so remote sessions group by project folder, else their own directory.
+		local base = if not cwd then nil elseif remote then Folders.owner(cwd, remoteOwners[hostName] or {}) else Folders.owner(cwd, owners)
+		local folder = if not cwd then Folders.OTHER elseif remote then hostName .. ":" .. base else base
 		local entry = group(folder)
 		if not remote then entry.remote = false elseif entry.remote == nil then entry.remote = true end
-		local sub = if cwd and not remote and cwd ~= entry.path then Folders.relative(cwd, entry.path) else nil
+		local sub = if cwd and cwd ~= base then Folders.relative(cwd, base) else nil
 		local ok, detected = pcall(Harness.detect, cx, session.id, snap)
 		local harness = if ok and detected then detected else { kind = "shell", label = "shell", icon = "terminal", state = "idle" }
 		local agent = if harness.state == "working" or harness.state == "waiting" then harness.state else nil
@@ -455,6 +497,44 @@ local function model(cx)
 		if x ~= y then return x < y end
 		return a.path < b.path
 	end)
+	-- Projects sit above loose folders, in their saved order; each holds its shown top-level folders.
+	local projectRows, inProject, projectByFolder = {}, {}, {}
+	local board = Mission.counts()
+	for _, project in projects do
+		local entry = {
+			name = project.name, folders = {}, total = 0, waiting = 0,
+			collapsed = collapsed["project:" .. project.name] == true,
+			board = board[string.lower(project.name)],
+			moving = if moving and moving.project == project.name then true else nil,
+		}
+		if entry.moving then movingLabel = project.name end
+		local function count(folder)
+			for _, session in folder.sessions do
+				entry.total += 1
+				if session.agent == "waiting" then entry.waiting += 1 end
+			end
+			for _, child in folder.children do count(child) end
+		end
+		for _, key in project.folders do
+			projectByFolder[key] = project.name
+			local folder = byPath[key]
+			if folder and not nested[folder] and not inProject[folder] then
+				inProject[folder] = true
+				folder.inProject = true
+				table.insert(entry.folders, folder)
+				count(folder)
+			end
+		end
+		table.insert(projectRows, entry)
+	end
+	-- Every top-level folder in drawn order: project folders first, then loose ones.
+	local shown = {}
+	for _, entry in projectRows do
+		for _, folder in entry.folders do table.insert(shown, folder) end
+	end
+	for _, entry in top do
+		if not inProject[entry] then table.insert(shown, entry) end
+	end
 	-- Settled: shelved sessions, newest first.
 	local rows = {}
 	local list = settledList()
@@ -465,13 +545,13 @@ local function model(cx)
 			sid = record.sid, name = record.name, badge = badge, role = role,
 			where = if record.cwd then Folders.short(record.cwd, home) else Folders.OTHER,
 			host = record.host or "local", harness = record.label or "shell", model = record.model,
-			age = Folders.age(math.max(0, now - (record.at or now))),
+			age = Folders.age(math.max(0, now - (record.at or now))), project = projectByFolder[folder],
 		})
 	end
 	-- The picked-up item closed or went away: drop the move.
 	if not movingLabel then moving = nil end
 	local result = {
-		groups = top, total = total, spinning = spinning, moving = movingLabel,
+		groups = shown, projects = projectRows, total = total, spinning = spinning, moving = movingLabel,
 		settled = { open = tern.kv.get("settled-open") == true, count = #list, rows = rows },
 	}
 	result.live, result.missionOpen = live, Mission.isOpen(cx)
@@ -554,7 +634,7 @@ local function orderOf(data)
 		for _, child in entry.children do walk(child) end
 	end
 	for _, entry in data.groups do
-		if not entry.other then table.insert(order.folders, entry.path) end
+		if not entry.other and not entry.inProject then table.insert(order.folders, entry.path) end
 		walk(entry)
 	end
 	return order
@@ -1343,14 +1423,141 @@ local function removeWorktree(cx, path)
 	end)
 end
 
+-- ── Projects: actions ───────────────────────────────────────────────────
+local function saveProjects(cx, list)
+	tern.kv.set("projects", list)
+	redraw(cx)
+end
+
+-- A project name from the user: trimmed, not blank, not taken by another project.
+local function askProjectName(cx, placeholder, value, except, done)
+	cx:prompt({ value = value, placeholder = placeholder, action = "save" }):next(function(answer, _err, nextCx)
+		if not nextCx or answer == nil then return end
+		local name = answer:match("^%s*(.-)%s*$")
+		if name == "" then nextCx:toast("error", "Name can't be blank") return end
+		local taken = projectNamed(projectList(), name)
+		if taken and taken.name ~= except then nextCx:toast("error", "Project exists", notificationLabel(name)) return end
+		done(nextCx, name)
+	end)
+end
+
+-- Moves folder `key` into project `name` (made when missing; new projects go on top).
+local function addToProject(cx, key, name)
+	local list = projectList()
+	local old = projectOf(list, key)
+	if old then table.remove(old.folders, table.find(old.folders, key)) end
+	local project = projectNamed(list, name)
+	if not project then
+		project = { name = name, folders = {} }
+		table.insert(list, 1, project)
+	end
+	table.insert(project.folders, key)
+	saveProjects(cx, list)
+	cx:toast("info", "Added to " .. notificationLabel(project.name), notificationLabel(Folders.basename(key)))
+end
+
+local function chooseProject(cx, key)
+	local list, items = projectList(), {}
+	local current = projectOf(list, key)
+	for _, project in list do
+		table.insert(items, { label = project.name, name = project.name, current = project == current })
+	end
+	table.insert(items, { label = "New project…", create = true })
+	cx:pick({
+		items = items, placeholder = "Add " .. notificationLabel(Folders.basename(key)) .. " to which project?",
+		icon = "folder", action = "choose",
+	}):next(function(item, _err, nextCx)
+		if not nextCx or not item then return end
+		if item.create then
+			askProjectName(nextCx, "New project name", nil, nil, function(nameCx, name) addToProject(nameCx, key, name) end)
+		else
+			addToProject(nextCx, key, item.name)
+		end
+	end)
+end
+
+local function removeFromProject(cx, key)
+	local list = projectList()
+	local project = projectOf(list, key)
+	if not project then return end
+	table.remove(project.folders, table.find(project.folders, key))
+	saveProjects(cx, list)
+end
+
+local function newProject(cx)
+	askProjectName(cx, "New project name", nil, nil, function(nextCx, name)
+		local list = projectList()
+		table.insert(list, 1, { name = name, folders = {} })
+		saveProjects(nextCx, list)
+		nextCx:toast("info", "Project created", "Right-click a folder › Add to project…")
+	end)
+end
+
+local function renameProject(cx, name)
+	askProjectName(cx, "Project name", name, name, function(nextCx, newName)
+		local list = projectList()
+		local project = projectNamed(list, name)
+		if not project then return end
+		project.name = newName
+		local collapsed = records("collapsed")
+		if collapsed["project:" .. name] then
+			collapsed["project:" .. name] = nil
+			collapsed["project:" .. newName] = true
+			tern.kv.set("collapsed", collapsed)
+		end
+		saveProjects(nextCx, list)
+	end)
+end
+
+-- Deleting a project only ungroups its folders.
+local function deleteProject(cx, name)
+	cx:pick({
+		items = {
+			{ label = "No, keep it", answer = false },
+			{ label = "Yes, delete it", detail = "Its folders and sessions stay", answer = true },
+		},
+		placeholder = "Delete project “" .. notificationLabel(name) .. "”?", action = "choose",
+	}):next(function(item, _err, nextCx)
+		if not nextCx or not item or item.answer ~= true then return end
+		local list = projectList()
+		local _, index = projectNamed(list, name)
+		if index then
+			table.remove(list, index)
+			saveProjects(nextCx, list)
+		end
+	end)
+end
+
+-- This Mac's folders only; a remote folder keeps its own + button.
+local function newSessionInProject(cx, name)
+	local project = projectNamed(projectList(), name)
+	if not project then redraw(cx); return end
+	local home, items = tern.getenv("HOME"), {}
+	for _, key in project.folders do
+		if string.sub(key, 1, 1) == "/" then table.insert(items, { label = Folders.short(key, home), path = key }) end
+	end
+	if #items == 0 then report(cx, "This project has no folders on this Mac.", "No folder") return end
+	if #items == 1 then openIn(cx, items[1].path) return end
+	cx:pick({ items = items, placeholder = "New session in…", icon = "folder", action = "open" }):next(function(item, _err, nextCx)
+		if nextCx and item then openIn(nextCx, item.path) end
+	end)
+end
+
+-- Mission control, filtered to the Board project of that name.
+local function openBoard(cx, name)
+	tern.kv.set("mission-filter", name)
+	Mission.open(cx)
+end
+
 tern.command({ id = "toggle", title = "Show or hide Roost", icon = "folder", keys = { "cmd+alt+shift+l" }, run = togglePanel })
-Mission.setup({ report = report, chooseFolder = chooseFolder })
+Mission.setup({ report = report, chooseFolder = chooseFolder, changed = function() redraw_later() end })
 tern.command({ id = "mission", title = "Roost: Show or hide Mission control", icon = "list-checks", run = Mission.toggle })
 tern.command({ id = "find", title = "Roost: Find session", icon = "search", run = findSession })
 tern.command({ id = "new", title = "Roost: New session in folder", icon = "folder-plus", run = newSession })
 tern.command({ id = "rename", title = "Roost: Rename current session", icon = "rename", run = function(cx)
 	renameSession(cx, cx.sessions:current().id)
 end })
+tern.command({ id = "new-project", title = "Roost: New project", icon = "folder-plus", run = newProject })
 
 -- Steps through sessions in panel order, wrapping at the ends.
 local function stepSession(cx, delta)
@@ -1371,9 +1578,32 @@ for n = 1, 9 do
 	end })
 end
 
+-- A folder moves among its project's folders, or among the loose ones; false when it would cross.
 local function placeFolder(path, target)
+	local list = projectList()
+	local from, to = projectOf(list, path), projectOf(list, target)
+	if from ~= to then return false end
+	if from then
+		local moved = Folders.move(from.folders, path, target)
+		if moved and path ~= target then
+			from.folders = moved
+			tern.kv.set("projects", list)
+		end
+		return true
+	end
 	local moved = drawnOrder and Folders.move(drawnOrder.folders, path, target)
 	if moved and path ~= target then tern.kv.set("folder-order", moved) end
+	return true
+end
+
+local function placeProject(name, target)
+	local list, names = projectList(), {}
+	for _, project in list do table.insert(names, project.name) end
+	local moved = name ~= target and Folders.move(names, name, target)
+	if not moved then return end
+	local out = {}
+	for _, each in moved do table.insert(out, (projectNamed(list, each))) end
+	tern.kv.set("projects", out)
 end
 
 -- Sessions follow their working directory, so they only move among their folder's sessions.
@@ -1407,7 +1637,12 @@ tern.on("canvas_action", function(ev, cx)
 			placeSession(cx, picked.session, tonumber(value))
 			return true
 		elseif picked.folder and act == "collapse" and path then
-			placeFolder(picked.folder, path)
+			if not placeFolder(picked.folder, path) then
+				cx:toast("info", "Folders stay in their project", "Use Add to project… or Remove from project.")
+			end
+			return true
+		elseif picked.project and act == "project-toggle" and path then
+			placeProject(picked.project, path)
 			return true
 		end
 	end
@@ -1424,14 +1659,17 @@ tern.on("canvas_action", function(ev, cx)
 	elseif act == "reveal" and path then reveal(cx, path)
 	elseif act == "pin" and path then togglePin(cx, path)
 	elseif act == "pr" and path then cx:open(path)
+	elseif act == "project-toggle" and path then toggleCollapse(cx, "project:" .. path)
+	elseif act == "project-new" and path then newSessionInProject(cx, path)
+	elseif act == "project-board" and path then openBoard(cx, path)
 	elseif act == "settled-toggle" then
 		tern.kv.set("settled-open", tern.kv.get("settled-open") ~= true)
 		redraw(cx)
 	elseif act == "restore" and value then restoreSettled(cx, value)
 	elseif act == "view" and value then viewSettled(cx, value)
 	elseif act == "Move" then
-		local id, folder = view.sessionId(ev.node), view.folderPath(ev.node)
-		moving = if id then { session = id } elseif folder then { folder = folder } else nil
+		local id, folder, project = view.sessionId(ev.node), view.folderPath(ev.node), view.projectName(ev.node)
+		moving = if id then { session = id } elseif folder then { folder = folder } elseif project then { project = project } else nil
 		redraw(cx)
 	-- Menu entries show their action verbatim, so these read as titled.
 	elseif act == "Rename" then
@@ -1456,8 +1694,15 @@ tern.on("canvas_action", function(ev, cx)
 			elseif act == "View" then viewSettled(cx, sid)
 			else forgetSettled(cx, sid) end
 		end
+	elseif act == "New session in…" or act == "Rename project" or act == "Delete project" then
+		local name = view.projectName(ev.node)
+		if not name then return true end
+		if act == "New session in…" then newSessionInProject(cx, name)
+		elseif act == "Rename project" then renameProject(cx, name)
+		else deleteProject(cx, name) end
 	elseif act == "New session here" or act == "New omp session here" or act == "Reveal in Finder"
-		or act == "Pin folder" or act == "Unpin folder" or act == "New worktree session" or act == "Remove worktree" then
+		or act == "Pin folder" or act == "Unpin folder" or act == "New worktree session" or act == "Remove worktree"
+		or act == "Add to project…" or act == "Remove from project" then
 		local folder = view.folderPath(ev.node)
 		if not folder then return true end
 		if act == "New session here" then openIn(cx, folder)
@@ -1465,6 +1710,8 @@ tern.on("canvas_action", function(ev, cx)
 		elseif act == "Reveal in Finder" then reveal(cx, folder)
 		elseif act == "New worktree session" then newWorktreeSession(cx, folder)
 		elseif act == "Remove worktree" then removeWorktree(cx, folder)
+		elseif act == "Add to project…" then chooseProject(cx, folder)
+		elseif act == "Remove from project" then removeFromProject(cx, folder)
 		else togglePin(cx, folder) end
 	else return false end
 	return true
@@ -1487,7 +1734,7 @@ local function tick(cx)
 		follow(cx)
 		seedActivity(cx)
 		autoName(cx)
-		Mission.tick(cx)
+		Mission.tick(cx, #projectList() > 0)
 		if slot(cx) then
 			if drawnPaths then refreshGit(cx, drawnPaths) end
 			if drawnLive then saveActivity(cx, drawnLive) end
