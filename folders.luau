@@ -7,6 +7,18 @@ local Folders = {}
 -- path, so it can never collide with a real folder.
 Folders.OTHER = "Other"
 
+-- Whether `key` is a path on this machine: "/..." (macOS, Linux) or "C:\..." (Windows);
+-- anything else is "host:path" on another machine, or Other.
+function Folders.isLocal(key)
+	return string.sub(key, 1, 1) == "/" or string.find(key, "^%a:[\\/]") ~= nil
+end
+
+-- A folder key on another machine split into host name and path; nil for this machine's folders and Other.
+function Folders.splitKey(key)
+	if key == Folders.OTHER or Folders.isLocal(key) then return nil end
+	return string.match(key, "^([^:]+):(.+)$")
+end
+
 -- macOS spells /tmp, /var and /etc as /private/...; tools disagree about which,
 -- so every path is held in the short form.
 local function canon(path)
@@ -19,10 +31,13 @@ local function canon(path)
 	return path
 end
 
--- Strips trailing slashes ("/" stays); anything but a nonempty string gives "".
+-- Strips trailing slashes ("/" and "C:\" stay); anything but a nonempty string gives "".
+-- Windows drive paths take "\" throughout, as Tern reports them (Git for Windows says "C:/").
 function Folders.norm(path)
 	if type(path) ~= "string" or path == "" then return "" end
-	local trimmed = string.gsub(path, "/+$", "")
+	if string.find(path, "^%a:[\\/]") then path = string.gsub(path, "/", "\\") end
+	if string.find(path, "^%a:\\+$") then return string.sub(path, 1, 2) .. "\\" end
+	local trimmed = string.gsub(path, "[/\\]+$", "")
 	if trimmed == "" then return "/" end
 	return canon(trimmed)
 end
@@ -32,11 +47,12 @@ function Folders.basename(path)
 	return string.match(path, "([^/\\]+)[/\\]*$") or path
 end
 
--- "~" for the home folder and paths inside it.
+-- "~" for the home folder and paths inside it (either separator).
 function Folders.short(path, home)
 	if home and home ~= "" and home ~= "/" then
 		if path == home then return "~" end
-		if string.sub(path, 1, #home + 1) == home .. "/" then return "~" .. string.sub(path, #home + 1) end
+		local next = string.sub(path, #home + 1, #home + 1)
+		if string.sub(path, 1, #home) == home and (next == "/" or next == "\\") then return "~" .. string.sub(path, #home + 1) end
 	end
 	return path
 end
@@ -109,6 +125,13 @@ end
 
 assert(Folders.norm("/a/b//") == "/a/b" and Folders.norm("///") == "/" and Folders.norm(nil) == "")
 assert(Folders.norm("/private/tmp/x/") == "/tmp/x" and Folders.norm("/private/tmpx") == "/private/tmpx")
+assert(Folders.norm("C:/Users/x/") == "C:\\Users\\x" and Folders.norm("C:\\") == "C:\\" and Folders.norm("C:/") == "C:\\")
+assert(Folders.isLocal("/a") and Folders.isLocal("C:\\a") and not Folders.isLocal("pc:C:\\a") and not Folders.isLocal("Other"))
+do
+	local host, path = Folders.splitKey("vinhlam-pc:C:\\Users")
+	assert(host == "vinhlam-pc" and path == "C:\\Users" and Folders.splitKey("C:\\Users") == nil and Folders.splitKey("/x") == nil)
+end
+assert(Folders.short("C:\\Users\\l\\dev", "C:\\Users\\l") == "~\\dev")
 assert(Folders.basename("/Volumes/VINH MAC/it's here/") == "it's here")
 assert(Folders.short("/Users/v/exo", "/Users/v") == "~/exo" and Folders.short("/Users/v", "/Users/v") == "~")
 assert(Folders.short("/Users/vv", "/Users/v") == "/Users/vv")

@@ -1,5 +1,6 @@
 --!nonstrict
 -- Which coding agent (if any) a session runs, plus display helpers for it and its host.
+local Platform = require("./platform")
 local Harness = {}
 
 -- Agent CLIs by program name -> kind.
@@ -24,16 +25,30 @@ local ICONS = {
 local RANK = { working = 3, waiting = 2, idle = 1 }
 local STATES = { working = "working", waiting_input = "waiting" }
 
+local function programKind(path)
+	if type(path) ~= "string" then return nil end
+	local name = string.lower(string.match(path, "[^/\\]+$") or "")
+	local bare, extension = string.match(name, "^(.+)%.(%w+)$")
+	if extension == "exe" or extension == "cmd" or extension == "bat" or extension == "ps1" then name = bare end
+	return KINDS[name]
+end
+
 -- The agent a command line runs, e.g. "omp", "cd x && claude --resume", "FOO=1 /usr/bin/codex".
 local function kindOfLine(line)
 	if type(line) ~= "string" then return nil end
 	for segment in string.gmatch(line, "[^;&|]+") do
-		for word in string.gmatch(segment, "%S+") do
-			if not string.find(word, "=", 1, true) then
-				local kind = KINDS[string.lower(string.match(word, "([^/]+)$") or "")]
+		local start = 1
+		for word, after in string.gmatch(segment, "(%S+)()") do
+			if not string.match(word, "^[%w_]+=") then
+				local quote = string.sub(word, 1, 1)
+				local program = if quote == '"' or quote == "'"
+					then string.match(segment, "^%s*" .. quote .. "([^" .. quote .. "]+)" .. quote, start) or word
+					else word
+				local kind = programKind(program)
 				if kind then return kind end
 				break
 			end
+			start = after
 		end
 	end
 	return nil
@@ -130,9 +145,9 @@ function Harness.title(raw, kind)
 		if not icon then start = pos; break end
 	end
 	local text = string.match(string.sub(raw, start), "^(.-)%s*$")
-	if text == "" or string.find(text, "^[/~]") then return nil end
+	if text == "" or string.find(text, "^[/~]") or string.find(text, "^%a:[/\\]") then return nil end
 	local lower = string.lower(text)
-	if KINDS[lower] or lower == string.lower(LABELS[kind] or "") then return nil end
+	if KINDS[lower] or (not string.find(text, "[/\\]") and programKind(text)) or lower == string.lower(LABELS[kind] or "") then return nil end
 	return text
 end
 
@@ -154,7 +169,8 @@ function Harness.detect(cx, sessionId, snap)
 			if pane and agent.state ~= "exited" then
 				seen[agent.pane] = true
 				local kind = kindOfLine(str(agent.agent_command)) or kindOfLine(str(agent.command))
-					or kindOfLine(str(agent.program)) or kindOfLine(str(pane.program)) or kindOfLine(str(pane.title))
+					or (Platform.windows and programKind(agent.program)) or kindOfLine(str(agent.program))
+					or (Platform.windows and programKind(pane.program)) or kindOfLine(str(pane.program)) or kindOfLine(str(pane.title))
 					or "omp" -- an unnamed native agent block is omp
 				local state = STATES[agent.state] or "idle"
 				consider(describe(kind, state, Harness.prettyModel(agent.model), agent.pane, Harness.title(pane.title, kind)), state, true)
@@ -162,7 +178,8 @@ function Harness.detect(cx, sessionId, snap)
 		end
 		for id, pane in panes do
 			if not seen[id] and pane.kind == "terminal" and pane.exited == nil then
-				local kind = kindOfLine(pane.running and pane.running.line) or kindOfLine(str(pane.program))
+				local kind = kindOfLine(pane.running and pane.running.line)
+					or (Platform.windows and programKind(pane.program)) or kindOfLine(str(pane.program))
 				if kind then
 					local state = if pane.busy and pane.running then "working" else "idle"
 					consider(describe(kind, state, nil, id, Harness.title(pane.title, kind)), state, false)
@@ -185,10 +202,19 @@ local computerName
 local pending = {}
 local fetching = false
 
--- Reads the computer name once, off-thread; `onReady` (optional) runs after it lands.
+function Harness.computerName(): string?
+	return computerName or nil
+end
+
+-- Reads the computer name once; `onReady` (optional) runs after it lands.
 function Harness.warm(onReady)
 	if computerName then
 		if onReady then onReady() end
+		return
+	end
+	if Platform.windows then
+		computerName = str(tern.getenv("COMPUTERNAME")) or false
+		if computerName and onReady then onReady() end
 		return
 	end
 	if onReady then table.insert(pending, onReady) end
@@ -234,9 +260,13 @@ assert(Harness.prettyModel("gemini-3.1-flash-lite") == "Gemini 3.1 Flash Lite" a
 assert(Harness.prettyModel("Opus 5.5") == "Opus 5.5" and Harness.prettyModel("") == nil and Harness.prettyModel(nil) == nil)
 assert(Harness.prettyModel("llama-3-70b:latest") == "Llama 3 70B" and Harness.prettyModel("grok-4.6") == "Grok 4.6")
 assert(kindOfLine("cd x && FOO=1 /usr/local/bin/claude --resume") == "claude" and kindOfLine("ls omp") == nil and kindOfLine(nil) == nil)
+assert(kindOfLine([[C:\Users\lamvi\.bun\bin\omp.exe --restore x]]) == "omp")
+assert(kindOfLine([[& "C:\Program Files\O'Neil\CLAUDE.CMD" --resume]]) == "claude")
+assert(programKind([[C:\Program Files\O'Neil\OMP.EXE]]) == "omp")
 assert(Harness.launchCommand("omp") == "omp" and Harness.launchCommand("shell") == nil and Harness.launchCommand("x") == nil)
 assert(Harness.title("\u{F0D9A} OMNI: Evaluate repos", "omp") == "OMNI: Evaluate repos" and Harness.title("✳ Fix login", "claude") == "Fix login")
 assert(Harness.title("omp", "omp") == nil and Harness.title("✳ Claude Code", "claude") == nil and Harness.title("~/src", "omp") == nil)
+assert(Harness.title("omp.exe", "omp") == nil and Harness.title([[C:\Users\lamvi]], "omp") == nil)
 assert(Harness.title("Đổi tên phiên", "omp") == "Đổi tên phiên" and Harness.title(nil, "omp") == nil and Harness.title("  ", "omp") == nil)
 
 return Harness

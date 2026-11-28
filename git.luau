@@ -1,6 +1,8 @@
 --!nonstrict
 -- Read-only repository inspection plus worktree add/remove, via argv subprocesses.
 -- Every function reports through its callback and never raises into the caller.
+local Folders = require("./folders")
+local Platform = require("./platform")
 local Git = {}
 -- Subprocesses started so far; lets tests prove caching and coalescing.
 Git._spawns = 0
@@ -58,23 +60,30 @@ local function failure(result, err)
 	return detail
 end
 
-local function chomp(text) return (string.gsub(text, "\n$", "")) end
+local function chomp(text) return (string.gsub(text, "\r?\n$", "")) end
+local function gitPath(path) return if Platform.windows then Folders.norm(path) else path end
 
 -- Name lookup without the user's shell; Tern's PATH may lack Homebrew.
 local ghPath
 local function findGh()
 	if ghPath then return ghPath end
-	local home = tern.getenv("HOME") or ""
 	local dirs = {}
-	for dir in string.gmatch((tern.getenv("PATH") or "") .. ":", "(.-):") do
-		if string.sub(dir, 1, 1) == "/" then table.insert(dirs, dir) end
+	local separator = if Platform.windows then ";" else ":"
+	for entry in string.gmatch((tern.getenv("PATH") or "") .. separator, "(.-)" .. separator) do
+		local dir = if Platform.windows then string.match(entry, '^"(.*)"$') or entry else entry
+		if (Platform.windows and string.find(dir, "^%a:[/\\]")) or string.sub(dir, 1, 1) == "/" then
+			table.insert(dirs, dir)
+		end
 	end
-	for _, dir in ipairs({ "/opt/homebrew/bin", "/usr/local/bin", home .. "/.local/bin" }) do
-		table.insert(dirs, dir)
+	if not Platform.windows then
+		for _, dir in ipairs({ "/opt/homebrew/bin", "/usr/local/bin", (tern.getenv("HOME") or "") .. "/.local/bin" }) do
+			table.insert(dirs, dir)
+		end
 	end
 	for _, dir in ipairs(dirs) do
-		if tern.fs.exists(dir .. "/gh") then
-			ghPath = dir .. "/gh"
+		local path = dir .. (if Platform.windows then "\\gh.exe" else "/gh")
+		if tern.fs.exists(path) then
+			ghPath = path
 			return ghPath
 		end
 	end
@@ -84,7 +93,7 @@ end
 -- `status --porcelain=v2 --branch` -> branch (nil when detached), dirty, ahead, behind.
 function Git._parseStatus(text)
 	local branch, dirty, ahead, behind = nil, false, 0, 0
-	for line in string.gmatch(text, "[^\n]+") do
+	for line in string.gmatch(text, "[^\r\n]+") do
 		if string.sub(line, 1, 1) ~= "#" then
 			dirty = true
 		else
@@ -105,13 +114,13 @@ function Git._parseWorktrees(text)
 			table.insert(list, { path = current.path, branch = current.branch, is_main = current.is_main })
 		end
 	end
-	for line in string.gmatch(text .. "\n", "(.-)\n") do
+	for line in string.gmatch(text, "[^\r\n]+") do
 		local path = string.match(line, "^worktree (.+)$")
 		if path then
 			flush()
 			count += 1
 			-- The first record is the main worktree.
-			current = { path = path, is_main = count == 1 }
+			current = { path = gitPath(path), is_main = count == 1 }
 		elseif current then
 			local ref = string.match(line, "^branch (.+)$")
 			if ref then current.branch = string.gsub(ref, "^refs/heads/", "") end
@@ -206,7 +215,7 @@ function Git.inspect(cx, path, cb)
 		if known and now < known.at + TTL_MS then return withRoot(known.root) end
 		git(path, { "rev-parse", "--show-toplevel" }, function(r, _, c)
 			if not r or r.status ~= 0 or r.stdout == "" then return call(cb, nil, c) end
-			local root = chomp(r.stdout)
+			local root = gitPath(chomp(r.stdout))
 			roots[path] = { at = tern.now(), root = root }
 			withRoot(root)
 		end)
@@ -245,7 +254,7 @@ function Git.addWorktree(cx, root, branch, cb)
 			if not check or check.status ~= 0 or chomp(check.stdout) ~= branch then
 				return call(cb, nil, "Invalid branch name: " .. branch, c)
 			end
-			local path = string.gsub(root, "/+$", "") .. "-" .. Git._sanitize(branch)
+			local path = string.gsub(root, if Platform.windows then "[/\\]+$" else "/+$", "") .. "-" .. Git._sanitize(branch)
 			if tern.fs.exists(path) then return call(cb, nil, "Path already exists: " .. path, c) end
 			git(root, { "show-ref", "--verify", "--quiet", "refs/heads/" .. branch }, function(ref, e2, c2)
 				if not ref then return call(cb, nil, e2, c2) end
@@ -270,10 +279,11 @@ function Git.removeWorktree(cx, path, cb)
 	local ok, err = pcall(function()
 		git(path, { "rev-parse", "--show-toplevel" }, function(top, e, c)
 			if not top or top.status ~= 0 then return call(cb, false, failure(top, e), c) end
-			local tree = chomp(top.stdout)
+			local tree = gitPath(chomp(top.stdout))
 			git(tree, { "worktree", "list", "--porcelain" }, function(listing, e2, c2)
 				if not listing or listing.status ~= 0 then return call(cb, false, failure(listing, e2), c2) end
-				local main = string.match(listing.stdout, "^worktree ([^\n]+)")
+				local main = string.match(listing.stdout, "^worktree ([^\r\n]+)")
+				if main then main = gitPath(main) end
 				if not main or main == tree then return call(cb, false, "Refusing to remove the main worktree.", c2) end
 				git(tree, { "status", "--porcelain" }, function(status, e3, c3)
 					if not status or status.status ~= 0 then return call(cb, false, failure(status, e3), c3) end
@@ -290,6 +300,15 @@ function Git.removeWorktree(cx, path, cb)
 		end)
 	end)
 	if not ok then fail(tostring(err)) end
+end
+
+assert(chomp("C:/O'Neil's work\r\n") == "C:/O'Neil's work")
+do
+	local branch, dirty, ahead, behind = Git._parseStatus("# branch.head topic\r\n# branch.ab +2 -1\r\n")
+	assert(branch == "topic" and not dirty and ahead == 2 and behind == 1)
+	local trees = Git._parseWorktrees("worktree C:/O'Neil's work\r\nbranch refs/heads/main\r\n\r\nworktree C:/stale\r\nprunable\r\n")
+	assert(#trees == 1 and trees[1].path == (if Platform.windows then [[C:\O'Neil's work]] else "C:/O'Neil's work")
+		and trees[1].branch == "main" and trees[1].is_main)
 end
 
 return Git

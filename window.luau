@@ -6,6 +6,8 @@ local Badge = require("./badge")
 local view = require("./view")
 local Mission = require("./mission")
 local Transcript = require("./transcript")
+local Platform = require("./platform")
+local Sync = require("./sync")
 
 local rendered = {}
 local problem
@@ -85,18 +87,11 @@ local function touchPane(cx, pane)
 	end
 end
 
-local function ternBinary()
-	for _, path in { "/Applications/Tern.app/Contents/MacOS/tern", (tern.getenv("HOME") or "") .. "/Applications/Tern.app/Contents/MacOS/tern" } do
-		if tern.fs.exists(path) then return path end
-	end
-	return nil
-end
-
 -- Sessions older than this plugin have no stamp. `tern inspect` knows how long
 -- each pane has been quiet, so start from that rather than from "now".
 local function seedActivity(cx)
 	if seeding or seedDone then return end
-	local bin = ternBinary()
+	local bin = Platform.ternBinary()
 	if not bin then seedDone = true; return end
 	seeding = true
 	tern.process.run({ bin, "inspect", "--json" }, { timeout_ms = 15000 }, function(result, nextCx)
@@ -274,10 +269,57 @@ local function badgeOf(path)
 end
 
 -- ── Projects ────────────────────────────────────────────────────────────
--- kv "projects": { name, folders = { folder key, ... } } in panel order. A folder key is a path
--- on this Mac or "host:path" on another host, and sits in at most one project.
+-- Each project: { name, folders = { folder key, ... } } in panel order. A folder key is a path on
+-- this machine or "host:path" on another host, and sits in at most one project. They live in
+-- ~/.roost/projects.json in machine-neutral form (see sync.luau), shared with Roost on other machines.
+local projectsFile = (function()
+	local home = Platform.home()
+	if not home then return nil end
+	local sep = if Platform.windows then "\\" else "/"
+	return home .. sep .. ".roost" .. sep .. "projects.json"
+end)()
+-- Connected hosts' names by lower-case name, refreshed each draw, to match other machines' names.
+local hostsByName = {}
+local projectsText, projectsCache = nil, {}
+
+local function readProjectsFile()
+	if not projectsFile or not tern.fs.exists(projectsFile) then return nil end
+	local ok, text = pcall(tern.fs.read, projectsFile, 1024 * 1024)
+	return if ok then text else nil
+end
+
+local function writeProjectsText(text)
+	tern.fs.mkdir(string.match(projectsFile, "^(.*)[/\\][^/\\]+$"))
+	tern.fs.write(projectsFile, text)
+end
+
+-- This machine's view of the shared projects; empty until its computer name is known.
 local function projectList()
-	return records("projects")
+	local me = Harness.computerName()
+	if not me or not projectsFile then return {} end
+	local text = readProjectsFile()
+	-- shortcut: one-time move from kv "projects" (before the shared file); drop once every machine has the file.
+	local legacy = tern.kv.get("projects")
+	if not text and type(legacy) == "table" and #legacy > 0 then
+		text = tern.json.encode({ updated = os.time(), projects = Sync.canonical(legacy, me) })
+		writeProjectsText(text)
+		tern.kv.set("projects", nil)
+	end
+	local key = (text or "") .. "\n" .. tern.json.encode(hostsByName)
+	if key ~= projectsText then
+		local data = text and Sync.decode(text)
+		projectsText, projectsCache = key, if data then Sync.localize(data.projects, me, hostsByName) else {}
+	end
+	local copy = {}
+	for _, project in projectsCache do table.insert(copy, { name = project.name, folders = table.clone(project.folders) }) end
+	return copy
+end
+
+-- Saves this machine's view; the newer file wins on the next sync with another machine.
+local function writeProjects(list)
+	local me = Harness.computerName()
+	if not me or not projectsFile then error("Roost cannot save projects yet: computer name unknown", 0) end
+	writeProjectsText(tern.json.encode({ updated = os.time(), projects = Sync.canonical(list, me) }))
 end
 
 local function projectOf(list, key)
@@ -301,7 +343,7 @@ end
 -- known directory close the list under "Other". A repository's linked
 -- worktrees nest under its main folder.
 local function model(cx)
-	local home = tern.getenv("HOME")
+	local home = Platform.home()
 	local now = os.time()
 	local snap = Harness.snapshot(cx)
 	local cwds = sessionCwds(cx, snap)
@@ -317,11 +359,15 @@ local function model(cx)
 		if norm ~= "" and not table.find(pinned, norm) then table.insert(pinned, norm) end
 	end
 	local owners = table.clone(pinned)
+	hostsByName = {}
+	for _, host in cx.hosts:list() do
+		if host.kind == "remote" then hostsByName[string.lower(host.name)] = host.name end
+	end
 	-- Project folders own the sessions below them; remote ones per host name, as plain paths.
 	local remoteOwners, projects = {}, projectList()
 	for _, project in projects do
 		for _, key in project.folders do
-			local host, path = string.match(key, "^([^/][^:]*):(.+)$")
+			local host, path = Folders.splitKey(key)
 			if host then
 				remoteOwners[host] = remoteOwners[host] or {}
 				table.insert(remoteOwners[host], path)
@@ -361,7 +407,7 @@ local function model(cx)
 	for _, project in projects do
 		for _, key in project.folders do
 			local entry = group(key)
-			if string.sub(key, 1, 1) ~= "/" and entry.remote == nil then entry.remote = true end
+			if not Folders.isLocal(key) and entry.remote == nil then entry.remote = true end
 		end
 	end
 	local total = 0
@@ -901,8 +947,7 @@ end
 
 -- A remote folder key "host:path" split into host name and path; nil for this Mac's folders.
 local function remoteFolder(key)
-	if key == Folders.OTHER or string.sub(key, 1, 1) == "/" then return nil end
-	return string.match(key, "^([^:]+):(.+)$")
+	return Folders.splitKey(key)
 end
 
 -- Runs `fn(cx)` once host `spec` (id or name) is shown: sessions:create only reaches the shown host.
@@ -1163,7 +1208,7 @@ end
 
 local function pinFolder(cx, path)
 	path = Folders.norm(path)
-	if string.sub(path, 1, 1) ~= "/" then
+	if not Folders.isLocal(path) then
 		report(cx, "Pick an absolute folder path.", "Folder not pinned")
 		return
 	end
@@ -1199,57 +1244,35 @@ local function toggleCollapse(cx, path)
 end
 
 local function reveal(cx, path)
-	tern.process.run({ "/usr/bin/open", path }, { timeout_ms = 15000 }, function(result, nextCx)
-		if not nextCx or result.status == 0 then return end
-		report(nextCx, "Couldn’t open " .. path .. ": " .. ((result.stderr or ""):match("^%s*(.-)%s*$")), "Reveal failed")
+	Platform.reveal(path, function(err, nextCx)
+		if nextCx and err then report(nextCx, "Couldn’t open " .. path .. ": " .. err, "Reveal failed") end
 	end)
 end
-
--- AppleScript for macOS's native folder picker; the start folder and prompt
--- arrive as arguments, so no path is ever spliced into the script text.
-local CHOOSE_FOLDER = {
-	"on run argv",
-	'POSIX path of (choose folder with prompt (item 2 of argv) default location (POSIX file (item 1 of argv)))',
-	"end run",
-}
 
 -- Where the picker starts: beside the last folder chosen, else ~/code, else ~.
 local function pickerStart()
 	local last = tern.kv.get("picker-start")
 	if type(last) == "string" and tern.fs.exists(last) then return last end
-	local home = tern.getenv("HOME") or "/"
-	if tern.fs.exists(home .. "/code") then return home .. "/code" end
+	local home = Platform.home() or "/"
+	local code = home .. (if Platform.windows then "\\code" else "/code")
+	if tern.fs.exists(code) then return code end
 	return home
 end
 
--- Opens macOS's folder picker and hands the chosen folder to `done(cx, path)`.
+-- Opens the system's folder picker and hands the chosen folder to `done(cx, path)`.
 local function chooseFolder(cx, prompt, done)
 	if picking then
 		cx:toast("info", "Folder picker already open", "Choose a folder or cancel it.")
 		return
 	end
 	picking = true
-	local argv = { "/usr/bin/osascript" }
-	for _, line in CHOOSE_FOLDER do
-		table.insert(argv, "-e")
-		table.insert(argv, line)
-	end
-	table.insert(argv, pickerStart())
-	table.insert(argv, prompt)
-	-- The picker waits for the user; give up after 30 minutes untouched.
-	tern.process.run(argv, { timeout_ms = 30 * 60 * 1000 }, function(result, nextCx)
+	Platform.chooseFolder(pickerStart(), prompt, function(chosen, err, nextCx)
 		picking = false
 		if not nextCx then return end
-		if result.status ~= 0 then
-			-- Cancel (AppleScript error -128), timeouts, and pickers ended by a
-			-- signal (status -1, e.g. a plugin reload) need no message.
-			if result.status == -1 or string.find(result.stderr or "", "-128", 1, true) then return end
-			report(nextCx, "Couldn't open the folder picker: " .. ((result.stderr or ""):match("^%s*(.-)%s*$")), "Folder picker failed")
-			return
-		end
-		local path = Folders.norm((result.stdout or ""):match("^%s*(.-)%s*$"))
+		if err then report(nextCx, "Couldn't open the folder picker: " .. err, "Folder picker failed") return end
+		local path = Folders.norm(chosen or "")
 		if path == "" then return end
-		tern.kv.set("picker-start", Folders.norm(string.match(path, "^(.*)/[^/]+$") or path))
+		tern.kv.set("picker-start", Folders.norm(string.match(path, "^(.*)[/\\][^/\\]+$") or path))
 		done(nextCx, path)
 	end)
 end
@@ -1283,7 +1306,7 @@ end
 local function newSessionOn(cx, host)
 	local isLocal = host.kind == "local"
 	local label = Harness.host(cx, host.id) or host.name
-	local home = tern.getenv("HOME")
+	local home = Platform.home()
 	local items = {}
 	local _, data = allSessions(cx)
 	local function walk(group)
@@ -1425,7 +1448,7 @@ end
 
 -- ── Projects: actions ───────────────────────────────────────────────────
 local function saveProjects(cx, list)
-	tern.kv.set("projects", list)
+	writeProjects(list)
 	redraw(cx)
 end
 
@@ -1532,11 +1555,11 @@ end
 local function newSessionInProject(cx, name)
 	local project = projectNamed(projectList(), name)
 	if not project then redraw(cx); return end
-	local home, items = tern.getenv("HOME"), {}
+	local home, items = Platform.home(), {}
 	for _, key in project.folders do
-		if string.sub(key, 1, 1) == "/" then table.insert(items, { label = Folders.short(key, home), path = key }) end
+		if Folders.isLocal(key) then table.insert(items, { label = Folders.short(key, home), path = key }) end
 	end
-	if #items == 0 then report(cx, "This project has no folders on this Mac.", "No folder") return end
+	if #items == 0 then report(cx, "This project has no folders on this machine.", "No folder") return end
 	if #items == 1 then openIn(cx, items[1].path) return end
 	cx:pick({ items = items, placeholder = "New session in…", icon = "folder", action = "open" }):next(function(item, _err, nextCx)
 		if nextCx and item then openIn(nextCx, item.path) end
@@ -1587,7 +1610,7 @@ local function placeFolder(path, target)
 		local moved = Folders.move(from.folders, path, target)
 		if moved and path ~= target then
 			from.folders = moved
-			tern.kv.set("projects", list)
+			writeProjects(list)
 		end
 		return true
 	end
@@ -1603,7 +1626,7 @@ local function placeProject(name, target)
 	if not moved then return end
 	local out = {}
 	for _, each in moved do table.insert(out, (projectNamed(list, each))) end
-	tern.kv.set("projects", out)
+	writeProjects(out)
 end
 
 -- Sessions follow their working directory, so they only move among their folder's sessions.
@@ -1721,6 +1744,47 @@ tern.chrome.status(function()
 	return { { text = "Roost", icon = "folder", command = "plugin.roost.toggle" } }
 end)
 
+-- Every 60 s, each connected host reached by this machine's `ssh <host name>` (key-based, BatchMode)
+-- trades ~/.roost/projects.json with this one: the newer file wins. A host without ssh is skipped quietly.
+local SYNC_MS = 60000
+local syncAt, syncing, syncWarned = 0, false, {}
+
+-- Whether a host runs Windows, from its sessions' folders (no session yet: unknown, skip it).
+local function hostIsWindows(name)
+	for _, record in known do
+		if record.host == name and record.cwd then return string.find(record.cwd, "^%a:[\\/]") ~= nil end
+	end
+	return nil
+end
+
+local function syncProjects(cx)
+	if syncing or not projectsFile or not Harness.computerName() or tern.now() - syncAt < SYNC_MS then return end
+	syncAt = tern.now()
+	local ssh = if Platform.windows then "ssh" else "/usr/bin/ssh"
+	local pending = {}
+	for _, host in cx.hosts:list() do
+		local windows = hostIsWindows(host.name)
+		if host.kind == "remote" and host.state == "connected" and windows ~= nil then
+			table.insert(pending, { name = host.name, windows = windows })
+		end
+	end
+	local function step()
+		local host = table.remove(pending, 1)
+		if not host then syncing = false return end
+		syncing = true
+		Sync.exchange(ssh, host.name, host.windows, readProjectsFile(), function(newText, err)
+			if err then
+				if not syncWarned[host.name] then syncWarned[host.name] = true; tern.log.warn("Roost project sync: " .. err) end
+			elseif newText then
+				local ok, writeErr = pcall(writeProjectsText, newText)
+				if ok then redraw_later() else tern.log.warn("Roost project sync: " .. tostring(writeErr)) end
+			end
+			step()
+		end)
+	end
+	step()
+end
+
 -- Every 750 ms: keep the panel in the shown tab, refresh stale repository state
 -- and draw what changed (renames and new sessions raise no event). The next tick
 -- is armed first: a hook killed for running over Tern's 50 ms budget never
@@ -1735,6 +1799,7 @@ local function tick(cx)
 		seedActivity(cx)
 		autoName(cx)
 		Mission.tick(cx, #projectList() > 0)
+		syncProjects(cx)
 		if slot(cx) then
 			if drawnPaths then refreshGit(cx, drawnPaths) end
 			if drawnLive then saveActivity(cx, drawnLive) end

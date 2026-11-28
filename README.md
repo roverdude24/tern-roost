@@ -50,7 +50,9 @@ Pin the folders you use most, so they always stay at the top. To reorder, right-
 
 A project groups folders that belong together: several repositories, a drive folder and its matching folder on another computer. Right-click any folder, on any host, and choose **Add to project…** (or **New project…** from there). Its sessions follow it, including sessions in subfolders: the deepest folder you added wins, so `~/Developer` can be one project while `~/Developer/my-app` belongs to another.
 
-Projects sit above your other folders and stay listed even when nothing runs in them; a folder with no live session is dimmed. The header shows how many sessions are live and how many agents wait for you. If the project has the same name as a VinhLam Board project, it also shows that project's open work; click it to open Mission control filtered to it. Hover the header for `+` (a new session in one of its folders on this Mac). Right-click it to rename, move or delete it; deleting only ungroups its folders.
+Projects sit above your other folders and stay listed even when nothing runs in them; a folder with no live session is dimmed. The header shows how many sessions are live and how many agents wait for you. If the project has the same name as a VinhLam Board project, it also shows that project's open work; click it to open Mission control filtered to it. Hover the header for `+` (a new session in one of its folders on this machine). Right-click it to rename, move or delete it; deleting only ungroups its folders.
+
+Projects are shared between your machines. Roost keeps them in `~/.roost/projects.json` and, once a minute, trades that file with every connected host it can reach with `ssh <host name>` (key-based, no password prompt): the newer file wins. Folders keep the machine they belong to, so a folder on your PC shows as `vinhlam-pc:C:\…` on the Mac and as plain `C:\…` on the PC.
 
 ### Git, when you want it
 
@@ -124,5 +126,6 @@ Mission control needs Node.js and a Board checkout at `~/Developer/vinhlam-board
 
 - **Overseer:** Roost installs next to [Overseer](https://github.com/mmnavarr/overseer), but the two panels share one left column, so show one at a time.
 - **Run from source:** clone the repo and run `tern plugin link "$PWD"`. Roost reloads whenever you save a file.
-- **Your data stays local:** pins, projects, order, panel width, activity times and Settled are kept in Tern's plugin store on your Mac.
+- **Your data stays local:** pins, order, panel width, activity times and Settled are kept in Tern's plugin store; projects in `~/.roost/projects.json`, copied only to your own hosts over ssh.
+- **Windows:** Roost runs in Tern on Windows too (folder picker, Explorer for *Reveal*, `C:\` paths). Mission control needs the VinhLam Board checked out on that machine.
 - **Credits:** forked from [mmnavarr/overseer](https://github.com/mmnavarr/overseer) (MIT, see `LICENSE`). The panel mechanics come from Overseer; folders, hosts, Settled and Mission control are new.
