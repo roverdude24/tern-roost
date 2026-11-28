@@ -4,7 +4,8 @@
 
 - Fixed sessions jumping into the wrong folder (often `/tmp`) and piling up there: Tern reports the running program's directory, and agents such as omp `cd` the whole process. A session now keeps the folder it was first seen in and moves only when its shell is at the prompt in another folder (kv `homes`).
 - Restoring a settled omp session reopens its conversation (`omp --restore` on its saved transcript, found by the session's agent title, else its name) instead of a blank omp.
-- Click a settled session to read its conversation beside the panel without restoring it (also right-click › View). This Mac's omp sessions only; needs `jq`.
+- Click a settled session to read its conversation beside the panel without restoring it (also right-click › View). Needs `jq`.
+- Both work for omp sessions on remote hosts too (macOS, Linux, Windows): Roost reaches the host with this Mac's `ssh <host name>`, so that name needs a working key-based `Host` entry in `~/.ssh/config`.
 
 ## 0.4.0
 

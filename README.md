@@ -56,7 +56,7 @@ Connected to another computer with `tern remote`? Its sessions show up in the sa
 
 ### Settled: a shelf, not a trash can
 
-Done with a session? **Settle** it. It closes, and Roost remembers its folder, name and agent. Click **↶** later to bring it back; an omp session comes back with its conversation. Click the row itself to read that conversation without restoring it. Sessions that end on their own land here too, so nothing gets lost.
+Done with a session? **Settle** it. It closes, and Roost remembers its folder, name and agent. Click **↶** later to bring it back; an omp session comes back with its conversation. Click the row itself to read that conversation without restoring it. This works for other machines too, as long as `ssh <host name>` reaches them from your Mac without a password. Sessions that end on their own land here too, so nothing gets lost.
 
 ## Mission control
 
