@@ -201,25 +201,30 @@ local function refreshGit(cx, paths)
 end
 
 -- ── Model ───────────────────────────────────────────────────────────────
--- The folder a tab works in: its focused pane's directory, else its first
--- terminal or agent's, else any block's. The focused pane is often a plugin
--- block, such as this panel, which has no directory.
+-- The folder a tab works in, and the pane it comes from: its focused pane's
+-- directory, else its first terminal or agent's, else any block's. The focused
+-- pane is often a plugin block, such as this panel, which has no directory.
 local function tabCwd(tab, panes)
 	local function known(pane)
 		return type(pane.cwd) == "string" and pane.cwd ~= "" and pane.kind ~= "plugin" and pane.kind ~= "canvas"
 	end
 	for _, pane in panes do
-		if pane.pane == tab.pane and known(pane) then return pane.cwd end
+		if pane.pane == tab.pane and known(pane) then return pane.cwd, pane end
 	end
 	for _, pane in panes do
-		if (pane.kind == "terminal" or pane.kind == "agent") and known(pane) then return pane.cwd end
+		if (pane.kind == "terminal" or pane.kind == "agent") and known(pane) then return pane.cwd, pane end
 	end
 	for _, pane in panes do
-		if known(pane) then return pane.cwd end
+		if known(pane) then return pane.cwd, pane end
 	end
-	if type(tab.cwd) == "string" and tab.cwd ~= "" then return tab.cwd end
-	return nil
+	if type(tab.cwd) == "string" and tab.cwd ~= "" then return tab.cwd, nil end
+	return nil, nil
 end
+
+-- kv "homes": session id -> its folder. A pane reports its running program's directory,
+-- and agents wander (omp's in-process bash `cd`s the whole agent, often to /tmp), so a
+-- session takes a new folder only while its shell sits at the prompt.
+local homes = records("homes")
 
 -- Each session's folder, by session id (as a string): its first tab's
 -- directory, falling through to the next tab when the first has none known.
@@ -238,13 +243,27 @@ local function sessionCwds(cx, snap)
 		tabsBySession[key] = tabsBySession[key] or {}
 		table.insert(tabsBySession[key], tab)
 	end
-	local result = {}
+	local result, changed = {}, false
 	for key, tabs in tabsBySession do
 		table.sort(tabs, function(a, b) return a.position < b.position end)
 		for _, tab in tabs do
-			local cwd = Folders.norm(tabCwd(tab, panesByTab[tab.id] or {}))
-			if cwd ~= "" then result[key] = cwd; break end
+			local raw, pane = tabCwd(tab, panesByTab[tab.id] or {})
+			local cwd = Folders.norm(raw)
+			if cwd ~= "" then
+				local atPrompt = pane ~= nil and pane.kind ~= "agent" and pane.at_prompt == true
+				if homes[key] == nil or (atPrompt and homes[key] ~= cwd) then homes[key] = cwd; changed = true end
+				result[key] = homes[key]
+				break
+			end
 		end
+	end
+	if changed then
+		local live = {}
+		for _, session in cx.sessions:list() do live[tostring(session.id)] = true end
+		for key in homes do
+			if not live[key] then homes[key] = nil end
+		end
+		tern.kv.set("homes", homes)
 	end
 	return result
 end

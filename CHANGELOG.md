@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed sessions jumping into the wrong folder (often `/tmp`) and piling up there: Tern reports the running program's directory, and agents such as omp `cd` the whole process. A session now keeps the folder it was first seen in and moves only when its shell is at the prompt in another folder (kv `homes`).
+
 ## 0.4.0
 
 - Mission control: a tab over the VinhLam Board (`vb`), toggled by the header icon (lit while open), palette *Roost: Show or hide Mission control* or the ✕ in the tab.

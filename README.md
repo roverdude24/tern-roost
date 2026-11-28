@@ -23,7 +23,7 @@ You need [Tern](https://docs.stencil.so/tern/) on macOS. That's it: no git, no r
 
 ### See every session at a glance
 
-Sessions are grouped by the folder they run in, so each project's work sits together. Each row tells you:
+Sessions are grouped by the folder they run in, so each project's work sits together. A session stays in its folder while an agent runs, even if the agent wanders into `/tmp`; it moves only when you `cd` at the shell prompt. Each row tells you:
 
 - **What it's doing:** a pulsing green dot while an agent works, blue when it's waiting for you, grey when idle.
 - **Which agent runs it:** omp, Claude Code, Codex, Pi, Hermes, Gemini, OpenCode or Aider, shown as an icon.
