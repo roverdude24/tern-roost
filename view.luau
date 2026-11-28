@@ -213,9 +213,9 @@ local function settledNode(row)
 	}, "\n")
 	return ui.node("col", { key = "z" .. row.sid, role = "roost.settledRow" }, {
 		ui.node("row", {
-			key = "row", role = "roost.settledHead", title = tip,
+			key = "row", role = "roost.settledHead", title = tip .. "\nClick to read its conversation",
 			aria = row.name .. ", settled " .. row.age .. " ago",
-			actions = { menu = { "Restore", "Forget" } },
+			actions = { click = "view=" .. row.sid, menu = { "View", "Restore", "Forget" } },
 		}, {
 			badge("badge", row.badge, row.role),
 			text("name", row.name, "roost.settledName"),

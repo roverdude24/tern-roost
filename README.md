@@ -56,7 +56,7 @@ Connected to another computer with `tern remote`? Its sessions show up in the sa
 
 ### Settled: a shelf, not a trash can
 
-Done with a session? **Settle** it. It closes, and Roost remembers its folder, name and agent. Click **↶** later to bring it back exactly as it was. Sessions that end on their own land here too, so nothing gets lost.
+Done with a session? **Settle** it. It closes, and Roost remembers its folder, name and agent. Click **↶** later to bring it back; an omp session comes back with its conversation. Click the row itself to read that conversation without restoring it. Sessions that end on their own land here too, so nothing gets lost.
 
 ## Mission control
 
@@ -110,7 +110,7 @@ Mission control needs Node.js and a Board checkout at `~/Developer/vinhlam-board
 | Folder (hover) | pin, `+` new session, ✦ new omp session, Finder |
 | Folder (right-click) | New session, New omp session, Reveal in Finder, Pin or Unpin, Move, New worktree session, Remove worktree |
 | Session (right-click) | Rename, Move, New tab here, Lock or Unlock, Settle, Close |
-| Settled (right-click) | Restore, Forget |
+| Settled (right-click) | View, Restore, Forget |
 | Palette | type *Roost* for show or hide, Find, New session in folder, Rename, Mission control, Next / Previous, Session 1–9 |
 
 ## Good to know

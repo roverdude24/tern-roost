@@ -5,6 +5,7 @@ local Harness = require("./harness")
 local Badge = require("./badge")
 local view = require("./view")
 local Mission = require("./mission")
+local Transcript = require("./transcript")
 
 local rendered = {}
 local problem
@@ -364,7 +365,7 @@ local function model(cx)
 		if at > entry.newest then entry.newest = at end
 		known[key] = {
 			name = session.name, cwd = cwd, folder = entry.path, kind = harness.kind, label = harness.label,
-			model = harness.model, host = hostName, at = at, remote = if remote then true else nil,
+			model = harness.model, title = harness.title, host = hostName, at = at, remote = if remote then true else nil,
 		}
 	end
 	if hostCount > 1 then
@@ -1027,17 +1028,45 @@ local function forgetSettled(cx, sid)
 	redraw(cx)
 end
 
--- Reopens a settled session where it was, running its harness when known.
+-- Reopens a settled session where it was, running its harness when known; an omp
+-- session reopens its saved conversation (found by its title, else its name).
 local function restoreSettled(cx, sid)
 	local record = findSettled(sid)
 	if not record then redraw(cx); return end
 	if not record.cwd then report(cx, "This session had no known folder.", "Cannot restore"); return end
-	local command = Harness.launchCommand(record.kind)
-	onHost(cx, if record.remote then record.host else localHostId(cx), function(hereCx)
-		if newSessionIn(hereCx, record.cwd, command, record.name, record.remote) then
-			forgetSettled(hereCx, sid)
-			hereCx:toast("info", "Session restored", notificationLabel(record.name))
-		end
+	local function launch(launchCx, command)
+		onHost(launchCx, if record.remote then record.host else localHostId(launchCx), function(hereCx)
+			if newSessionIn(hereCx, record.cwd, command, record.name, record.remote) then
+				forgetSettled(hereCx, sid)
+				hereCx:toast("info", "Session restored", notificationLabel(record.name))
+			end
+		end)
+	end
+	if record.kind ~= "omp" or record.remote then launch(cx, Harness.launchCommand(record.kind)); return end
+	Transcript.find(record.title or record.name, function(path, nextCx)
+		if not nextCx then return end
+		launch(nextCx, if path then Transcript.restoreCommand(path) else "omp")
+	end)
+end
+
+-- Shows a settled omp session's conversation beside the panel, without restoring it.
+local function viewSettled(cx, sid)
+	local record = findSettled(sid)
+	if not record then redraw(cx); return end
+	if record.kind ~= "omp" or record.remote then
+		report(cx, "Only this Mac's omp conversations can be viewed.", "Nothing to show")
+		return
+	end
+	Transcript.find(record.title or record.name, function(path, nextCx)
+		if not nextCx then return end
+		if not path then report(nextCx, "No saved conversation found for it.", "Nothing to show"); return end
+		local out = tern.plugin.data .. "/settled-view.md"
+		Transcript.markdown(path, out, record.name, function(err, doneCx)
+			if not doneCx then return end
+			if err then report(doneCx, err, "Conversation not shown"); return end
+			local ok, openErr = pcall(function() doneCx.docs:open(out, { how = "beside" }) end)
+			if not ok then report(doneCx, openErr, "Conversation not shown") end
+		end)
 	end)
 end
 
@@ -1388,6 +1417,7 @@ tern.on("canvas_action", function(ev, cx)
 		tern.kv.set("settled-open", tern.kv.get("settled-open") ~= true)
 		redraw(cx)
 	elseif act == "restore" and value then restoreSettled(cx, value)
+	elseif act == "view" and value then viewSettled(cx, value)
 	elseif act == "Move" then
 		local id, folder = view.sessionId(ev.node), view.folderPath(ev.node)
 		moving = if id then { session = id } elseif folder then { folder = folder } else nil
@@ -1408,10 +1438,12 @@ tern.on("canvas_action", function(ev, cx)
 	elseif act == "Close session" then
 		local id = view.sessionId(ev.node)
 		if id then closeSession(cx, id, false) end
-	elseif act == "Restore" or act == "Forget" then
+	elseif act == "Restore" or act == "Forget" or act == "View" then
 		local sid = view.settledId(ev.node)
 		if sid then
-			if act == "Restore" then restoreSettled(cx, sid) else forgetSettled(cx, sid) end
+			if act == "Restore" then restoreSettled(cx, sid)
+			elseif act == "View" then viewSettled(cx, sid)
+			else forgetSettled(cx, sid) end
 		end
 	elseif act == "New session here" or act == "New omp session here" or act == "Reveal in Finder"
 		or act == "Pin folder" or act == "Unpin folder" or act == "New worktree session" or act == "Remove worktree" then
